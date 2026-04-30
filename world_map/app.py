@@ -205,17 +205,16 @@ def _get_default_event_config():
     }
 
 
-def initialize_events(events_path, world=None):
+def initialize_events(events_path, flask_app, world=None):
     """Initialize event loader with optional world instance for geo coordinates."""
     try:
         from world_map.events.event_loader import load_events_with_world
         event_loader = load_events_with_world(events_path, world)
+        flask_app.config['EVENT_LOADER'] = event_loader
         logger.info(f"Event loader initialized from {events_path}")
     except Exception as e:
         logger.error(f"Failed to initialize event loader: {e}")
-        event_loader = None
-
-    app.config['EVENT_LOADER'] = event_loader
+        flask_app.config['EVENT_LOADER'] = None
 
 
 def get_world():
@@ -231,11 +230,6 @@ def get_event_loader():
     """Get the event loader instance."""
     from flask import current_app
     return current_app.config.get('EVENT_LOADER')
-
-
-# Create Flask app
-app = Flask(__name__)
-CORS(app)
 
 
 def create_app(world, map_config=None, panel_config_path=None):
@@ -254,6 +248,9 @@ def create_app(world, map_config=None, panel_config_path=None):
     Returns:
         Flask app instance
     """
+    app = Flask(__name__)
+    CORS(app)
+
     app.config['WORLD'] = world
 
     default_map_config = {
@@ -295,6 +292,18 @@ def create_app(world, map_config=None, panel_config_path=None):
     app.register_blueprint(events_bp)
     app.register_blueprint(config_bp)
 
+    # ============================================================================
+    # Error Handlers
+    # ============================================================================
+
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({'error': 'Not found'}), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        return jsonify({'error': 'Internal server error'}), 500
+
     return app
 
 
@@ -302,20 +311,6 @@ def create_app(world, map_config=None, panel_config_path=None):
 def initialize_app(world, map_config=None, panel_config_path=None):
     """Alias for create_app() — kept for backwards compatibility."""
     return create_app(world, map_config=map_config, panel_config_path=panel_config_path)
-
-
-# ============================================================================
-# Error Handlers
-# ============================================================================
-
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({'error': 'Not found'}), 404
-
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
 
 
 if __name__ == '__main__':

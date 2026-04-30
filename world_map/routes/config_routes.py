@@ -26,9 +26,14 @@ def index():
 @config_bp.route('/api/map/config')
 def get_map_config():
     """Get map configuration including background type and bounds."""
-    config = dict(current_app.config['MAP_CONFIG'])
-    config['slim_mode'] = hasattr(current_app.config['WORLD'], '_unit_statistics')
-    return jsonify(config)
+    try:
+        world = current_app.config['WORLD']
+        config = dict(current_app.config['MAP_CONFIG'])
+        config['slim_mode'] = hasattr(world, '_unit_statistics')
+        return jsonify(config)
+    except Exception as e:
+        logger.error(f"Error getting map config: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @config_bp.route('/api/panel/config')
