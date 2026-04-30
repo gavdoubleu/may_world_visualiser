@@ -50,7 +50,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from geo_units_dataframe import load_geo_units_dataframe
+from world_map.events.geo_units_dataframe import load_geo_units_dataframe
 
 # Canonical order used when iterating over event types.
 ALL_EVENT_TYPES = ["infections", "deaths", "symptom_changes"]

@@ -49,13 +49,12 @@ from pathlib import Path
 import yaml
 
 # ---------------------------------------------------------------------------
-# Path setup — world_map/ directory must be on sys.path for local imports
+# Path setup
 # ---------------------------------------------------------------------------
-SCRIPT_DIR = Path(__file__).parent.resolve()
-sys.path.insert(0, str(SCRIPT_DIR))
+WORLD_MAP_DIR = Path(__file__).parent.resolve() / 'world_map'
 
-from theme_css import build_root_block
-from core.world_loader import load_world_from_hdf5
+from world_map.themes.theme_css import build_root_block
+from world_map.core.world_loader import load_world_from_hdf5
 
 LEAFLET_VERSION = '1.9.4'
 LEAFLET_JS_URL = f'https://unpkg.com/leaflet@{LEAFLET_VERSION}/dist/leaflet.js'
@@ -280,10 +279,7 @@ def _collect_events_data(events_path: str, world, event_config: dict,
         events_timeseries  {time_min, time_max, step, rolling_window, types}
         geo_unit_lookup    {str(geo_unit_id): {c: [lat,lon], p: population}}
     """
-    import sys as _sys
-    import os as _os
-    # event_loader lives in the world_map/ dir which is already on sys.path
-    from event_loader import load_events_with_world
+    from world_map.events.event_loader import load_events_with_world
 
     print(f"  Loading events from {events_path} ...", flush=True)
     loader = load_events_with_world(events_path, world)
@@ -817,9 +813,9 @@ def main() -> None:
     n_steps = '6' if args.events_file else '5'
     print(f'\n[2/{n_steps}] Collecting world data (max {args.max_size_mb:.0f} MB) ...')
 
-    from app import initialize_app  # noqa: E402 — must be after sys.path setup
+    from world_map.app import create_app
 
-    flask_app = initialize_app(world, map_config=map_config)
+    flask_app = create_app(world, map_config=map_config)
     flask_app.config['TESTING'] = True
 
     # Build the full lists of unit names and venue IDs needed for detail pages
@@ -855,13 +851,13 @@ def main() -> None:
 
     # ---- [3] Read static files -----------------------------------------------
     print('\n[3/5] Reading static files ...')
-    static_dir = SCRIPT_DIR / 'static'
+    static_dir = WORLD_MAP_DIR / 'static'
     css_style  = (static_dir / 'css' / 'style.css').read_text(encoding='utf-8')
     css_events = (static_dir / 'css' / 'events.css').read_text(encoding='utf-8')
     js_app     = (static_dir / 'js' / 'app.js').read_text(encoding='utf-8')
     js_events  = (static_dir / 'js' / 'events.js').read_text(encoding='utf-8')
     print('  style.css, events.css, app.js, events.js — OK')
-    theme     = _load_theme(SCRIPT_DIR)
+    theme     = _load_theme(WORLD_MAP_DIR)
     theme_css = _build_theme_css(theme, static_dir)
 
     # ---- [4] Leaflet ---------------------------------------------------------

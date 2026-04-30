@@ -9,7 +9,7 @@
 # ==============================================================================
 
 # Path to your World instance file
-WORLD_FILE="../my_world.joblib"
+WORLD_FILE="my_world.joblib"
 
 # Path to your custom map image (local file or URL)
 # Examples:

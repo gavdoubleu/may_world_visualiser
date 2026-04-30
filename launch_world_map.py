@@ -7,10 +7,10 @@ Loads world_state.h5 with no dependencies on the may module.
 import sys
 from pathlib import Path
 
-from core.world_loader import load_world_from_hdf5
+from world_map.core.world_loader import load_world_from_hdf5
 
 # Import the Flask app
-from app import initialize_app
+from world_map.app import create_app
 
 
 def load_world_from_file(filepath):
@@ -177,7 +177,7 @@ Examples:
 
             # Copy image to static directory
             import shutil
-            static_images_dir = Path(__file__).parent / 'static' / 'map_images'
+            static_images_dir = Path(__file__).parent / 'world_map' / 'static' / 'map_images'
             static_images_dir.mkdir(parents=True, exist_ok=True)
 
             dest_file = static_images_dir / image_file.name
@@ -212,7 +212,7 @@ Examples:
         print("\nMap Configuration: OpenStreetMap (default)")
 
     # Initialize and run the Flask app
-    app = initialize_app(world, map_config=map_config)
+    app = create_app(world, map_config=map_config)
 
     # Initialize events if provided
     if args.events_file:
@@ -220,7 +220,7 @@ Examples:
         if events_path.exists():
             print(f"\nLoading events from: {events_path}")
             try:
-                from app import initialize_events, load_event_config
+                from world_map.app import initialize_events, load_event_config
                 load_event_config()
                 initialize_events(str(events_path), app, world)
                 print("Events loaded successfully!")
