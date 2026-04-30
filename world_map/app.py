@@ -6,67 +6,38 @@ This Flask application provides an interactive map interface for exploring
 World instances containing geography, population, venues, and households.
 """
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify
 from flask_cors import CORS
 import logging
-from collections import defaultdict
-import json
 import yaml
 from pathlib import Path
-from theme_css import build_root_block
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global world instance - set via initialize_app()
-_world_instance = None
-
-# Flat {venue.id: venue} lookup built at startup (venue IDs are Python memory
-# addresses so they are unique within a session but VenueManager has no global
-# lookup method — we build one here instead of modifying VenueManager)
-_venue_index: dict = {}
-
-# Global map configuration
-_map_config = {
-    'background_type': 'osm',  # 'osm' or 'image'
-    'image_url': None,
-    'bounds': None,  # [[south, west], [north, east]]
-    'attribution': None
-}
-
-# Global info panel configuration
-_panel_config = None
-
-# Global theme configuration
-_theme_config = None
-
 
 def load_panel_config(config_path=None):
     """Load info panel configuration from YAML file."""
-    global _panel_config
-
     if config_path is None:
         config_path = Path(__file__).parent / 'yaml' / 'info_panel_config.yaml'
 
     try:
         with open(config_path, 'r') as f:
-            _panel_config = yaml.safe_load(f)
+            panel_config = yaml.safe_load(f)
         logger.info(f"Loaded panel config from {config_path}")
     except FileNotFoundError:
         logger.warning(f"Panel config not found at {config_path}, using defaults")
-        _panel_config = _get_default_panel_config()
+        panel_config = _get_default_panel_config()
     except Exception as e:
         logger.error(f"Error loading panel config: {e}")
-        _panel_config = _get_default_panel_config()
+        panel_config = _get_default_panel_config()
 
-    return _panel_config
+    return panel_config
 
 
 def load_theme_config(app_config_path=None):
     """Load theme from app_config.yaml, then from yaml/themes/{theme}.yaml."""
-    global _theme_config
-
     if app_config_path is None:
         app_config_path = Path(__file__).parent / 'yaml' / 'app_config.yaml'
 
@@ -81,13 +52,13 @@ def load_theme_config(app_config_path=None):
     theme_path = Path(__file__).parent / 'yaml' / 'themes' / f'{theme_name}.yaml'
     try:
         with open(theme_path, 'r') as f:
-            _theme_config = yaml.safe_load(f)
+            theme_config = yaml.safe_load(f)
         logger.info(f"Loaded theme '{theme_name}' from {theme_path}")
     except FileNotFoundError:
         logger.warning(f"Theme file not found: {theme_path}, using empty theme")
-        _theme_config = {}
+        theme_config = {}
 
-    return _theme_config
+    return theme_config
 
 
 def _convert_numpy_types(obj):
@@ -144,737 +115,23 @@ def _get_default_panel_config():
     }
 
 
-def initialize_app(world, map_config=None, panel_config_path=None):
-    """
-    Initialize the Flask app with a World instance and optional map configuration.
-
-    Args:
-        world: World instance to visualize
-        map_config: Dict with optional keys:
-            - background_type: 'osm' (default) or 'image'
-            - image_url: URL or path to background image (required if background_type='image')
-            - bounds: [[south, west], [north, east]] geographic bounds (required if background_type='image')
-            - attribution: Attribution text for the image
-        panel_config_path: Path to info panel YAML config (optional)
-
-    Returns:
-        Flask app instance
-    """
-    global _world_instance, _map_config, _venue_index
-    _world_instance = world
-
-    if map_config:
-        _map_config.update(map_config)
-
-    # Build a flat venue index keyed by venue.id (Python memory address)
-    _venue_index = {}
-    if world.venues:
-        for venue in world.venues.get_all_venues().values():
-            _venue_index[venue.id] = venue
-
-    # Load panel configuration
-    load_panel_config(panel_config_path)
-    load_theme_config()
-
-    logger.info(f"Initialized world map with: {world}")
-    log_cfg = {k: (v[:60] + '…' if isinstance(v, str) and len(v) > 60 else v)
-               for k, v in _map_config.items()}
-    logger.info(f"Map configuration: {log_cfg}")
-    return app
-
-
-def get_world():
-    """Get the current World instance."""
-    if _world_instance is None:
-        raise RuntimeError("World instance not initialized. Call initialize_app() first.")
-    return _world_instance
-
-
-# Create Flask app
-app = Flask(__name__)
-CORS(app)
-
-
-# ============================================================================
-# Web Routes
-# ============================================================================
-
-@app.route('/')
-def index():
-    """Serve the main interactive map page."""
-    global _theme_config
-    if _theme_config is None:
-        load_theme_config()
-    logo_path = (_theme_config or {}).get('logo_path', '')
-    logo_url = f'/static/{logo_path}' if logo_path else ''
-    return render_template('index.html', logo_url=logo_url)
-
-
-@app.route('/api/map/config')
-def get_map_config():
-    """Get map configuration including background type and bounds."""
-    config = dict(_map_config)
-    config['slim_mode'] = hasattr(get_world(), '_unit_statistics')
-    return jsonify(config)
-
-
-@app.route('/api/panel/config')
-def get_panel_config():
-    """Get info panel configuration for customizing displayed attributes."""
-    global _panel_config
-    if _panel_config is None:
-        load_panel_config()
-    return jsonify(_panel_config)
-
-
-@app.route('/api/theme')
-def get_theme():
-    """Return theme configuration as JSON."""
-    global _theme_config
-    if _theme_config is None:
-        load_theme_config()
-    return jsonify(_theme_config)
-
-
-@app.route('/api/theme.css')
-def get_theme_css():
-    """Return a CSS stylesheet generated from the active theme config."""
-    global _theme_config
-    if _theme_config is None:
-        load_theme_config()
-
-    theme = _theme_config or {}
-    fonts = theme.get('fonts', {})
-
-    display_font = fonts.get('display', 'sans-serif')
-    body_font = fonts.get('body', 'sans-serif')
-    display_file = fonts.get('display_file', '')
-    body_file = fonts.get('body_file', '')
-
-    css_lines = []
-
-    if display_file:
-        css_lines.append(
-            f"@font-face {{\n"
-            f"    font-family: '{display_font}';\n"
-            f"    src: url('/static/fonts/{display_file}') format('woff2');\n"
-            f"    font-weight: normal;\n"
-            f"    font-style: normal;\n"
-            f"}}"
-        )
-    if body_file and body_file != display_file:
-        css_lines.append(
-            f"@font-face {{\n"
-            f"    font-family: '{body_font}';\n"
-            f"    src: url('/static/fonts/{body_file}') format('woff2');\n"
-            f"    font-weight: normal;\n"
-            f"    font-style: normal;\n"
-            f"}}"
-        )
-
-    css_lines.append(build_root_block(theme))
-
-    return app.response_class(
-        response="\n\n".join(css_lines),
-        status=200,
-        mimetype='text/css'
-    )
-
-
-# ============================================================================
-# API: Geography
-# ============================================================================
-
-@app.route('/api/geography/levels')
-def get_geography_levels():
-    """Get available geography levels."""
-    try:
-        world = get_world()
-        if not world.geography:
-            return jsonify({'levels': []})
-
-        return jsonify({
-            'levels': world.geography.levels,
-            'units_per_level': {
-                level: len(world.geography.get_units_by_level(level))
-                for level in world.geography.levels
-            }
-        })
-    except Exception as e:
-        logger.error(f"Error getting geography levels: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/geography/<level>')
-def get_geography_level(level):
-    """
-    Get all geographical units at a specific level as GeoJSON.
-
-    Returns point features with coordinates and metadata.
-    For units with children, aggregates population and venue counts from all descendants.
-    """
-    try:
-        world = get_world()
-        if not world.geography:
-            return jsonify({'type': 'FeatureCollection', 'features': []})
-
-        units = world.geography.get_units_by_level(level)
-        if not units:
-            return jsonify({'type': 'FeatureCollection', 'features': []})
-
-        features = []
-        for unit_name, unit in units.items():
-            if not unit.coordinates:
-                continue
-
-            lat, lon = unit.coordinates
-
-            # Use get_people() to recursively get all people from unit and descendants
-            all_people = unit.get_people()
-            population = len(all_people) if all_people else 0
-
-            # Aggregate venues from unit and all descendants
-            all_venues = list(unit.venues) if unit.venues else []
-            if unit.children:
-                for descendant in unit.get_descendants():
-                    if descendant.venues:
-                        all_venues.extend(descendant.venues)
-            venues_count = len(all_venues)
-
-            # Get venue breakdown from all aggregated venues
-            venue_types = defaultdict(int)
-            for venue in all_venues:
-                venue_types[str(venue.type)] += 1
-
-            feature = {
-                'type': 'Feature',
-                'properties': {
-                    'id': int(unit.id) if hasattr(unit.id, 'item') else unit.id,
-                    'name': str(unit.name),
-                    'level': str(unit.level),
-                    'population': int(population),
-                    'venues_count': int(venues_count),
-                    'venue_types': dict(venue_types),
-                    'has_parent': unit.parent is not None,
-                    'children_count': int(len(unit.children)) if unit.children else 0
-                },
-                'geometry': {
-                    'type': 'Point',
-                    # Convert numpy floats to Python floats for JSON serialization
-                    'coordinates': [float(lon), float(lat)]
-                }
-            }
-            features.append(feature)
-
-        geojson = {
-            'type': 'FeatureCollection',
-            'features': features
-        }
-
-        logger.info(f"Returned {len(features)} features for level {level}")
-        return jsonify(geojson)
-
-    except Exception as e:
-        logger.error(f"Error getting geography level {level}: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/geography/unit/<unit_name>')
-def get_unit_details(unit_name):
-    """Get detailed information about a specific geographical unit.
-
-    In slim mode, returns pre-computed statistics (no venue list, no people list).
-    In full mode, aggregates statistics from all descendants.
-    """
-    try:
-        world = get_world()
-        if not world.geography:
-            return jsonify({'error': 'No geography data'}), 404
-
-        unit = world.geography.get_unit(unit_name)
-        if not unit:
-            return jsonify({'error': f'Unit {unit_name} not found'}), 404
-
-        # Parent and children info (needed in both modes)
-        parent_info = None
-        if unit.parent:
-            parent_info = {
-                'id': unit.parent.id,
-                'name': unit.parent.name,
-                'level': unit.parent.level
-            }
-
-        # ---- Slim mode: serve pre-computed stats ----------------------------
-        unit_statistics = getattr(world, '_unit_statistics', None)
-        if unit_statistics is not None:
-            pre = unit_statistics.get(unit_name, {})
-            children_info = []
-            if unit.children:
-                for child in unit.children:
-                    child_pre = unit_statistics.get(child.name, {})
-                    children_info.append({
-                        'id': child.id,
-                        'name': child.name,
-                        'level': child.level,
-                        'population': child_pre.get('population', 0),
-                    })
-            venues_count = sum(pre.get('venue_types', {}).values())
-            return jsonify(_convert_numpy_types({
-                'id': unit.id,
-                'name': unit.name,
-                'level': unit.level,
-                'coordinates': unit.coordinates,
-                'population': pre.get('population', 0),
-                'age_distribution': pre.get('age_distribution', {}),
-                'sex_distribution': pre.get('sex_distribution', {}),
-                'venues_count': venues_count,
-                'venue_types': pre.get('venue_types', {}),
-                'activity_counts': pre.get('activity_counts', {}),
-                'parent': parent_info,
-                'children': children_info,
-                'properties': unit.properties,
-                'slim_mode': True,
-            }))
-
-        # ---- Full mode: compute on the fly ----------------------------------
-        all_people = unit.get_people()
-
-        age_groups = {
-            '0-15': 0, '16-24': 0, '25-34': 0,
-            '35-49': 0, '50-64': 0, '65+': 0
-        }
-        sex_distribution = defaultdict(int)
-        for person in all_people:
-            if person.age <= 15:    age_groups['0-15'] += 1
-            elif person.age <= 24:  age_groups['16-24'] += 1
-            elif person.age <= 34:  age_groups['25-34'] += 1
-            elif person.age <= 49:  age_groups['35-49'] += 1
-            elif person.age <= 64:  age_groups['50-64'] += 1
-            else:                   age_groups['65+'] += 1
-            sex_distribution[person.sex] += 1
-
-        all_venues = list(unit.venues) if unit.venues else []
-        if unit.children:
-            for descendant in unit.get_descendants():
-                if descendant.venues:
-                    all_venues.extend(descendant.venues)
-
-        venue_details = []
-        venue_types = defaultdict(int)
-        for venue in all_venues:
-            venue_types[venue.type] += 1
-            if len(venue_details) < 50:
-                venue_details.append({
-                    'id': venue.id,
-                    'name': venue.name,
-                    'type': venue.type,
-                    'coordinates': venue.coordinates,
-                    'properties': venue.properties
-                })
-
-        children_info = []
-        if unit.children:
-            for child in unit.children:
-                children_info.append({
-                    'id': child.id,
-                    'name': child.name,
-                    'level': child.level,
-                    'population': len(child.get_people()),
-                })
-
-        return jsonify({
-            'id': unit.id,
-            'name': unit.name,
-            'level': unit.level,
-            'coordinates': unit.coordinates,
-            'population': len(all_people),
-            'age_distribution': age_groups,
-            'sex_distribution': dict(sex_distribution),
-            'venues_count': len(all_venues),
-            'venue_types': dict(venue_types),
-            'venue_details': venue_details,
-            'parent': parent_info,
-            'children': children_info,
-            'properties': unit.properties,
-            'slim_mode': False,
-        })
-
-    except Exception as e:
-        logger.error(f"Error getting unit details for {unit_name}: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# API: Population
-# ============================================================================
-
-@app.route('/api/population/statistics')
-def get_population_statistics():
-    """Get overall population statistics."""
-    try:
-        world = get_world()
-        if not world.population:
-            return jsonify({'error': 'No population data'}), 404
-
-        stats = world.population.get_statistics()
-
-        # Add geographical distribution
-        geo_distribution = defaultdict(int)
-        if world.geography:
-            for level in world.geography.levels:
-                units = world.geography.get_units_by_level(level)
-                for unit in units.values():
-                    if unit.people:
-                        geo_distribution[level] += len(unit.people)
-
-        stats['geographical_distribution'] = dict(geo_distribution)
-
-        return jsonify(stats)
-
-    except Exception as e:
-        logger.error(f"Error getting population statistics: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/population/person/<int:person_id>')
-def get_person_details(person_id):
-    """Get detailed information about a specific person including activity_map."""
-    try:
-        world = get_world()
-        if not world.population:
-            return jsonify({'error': 'No population data'}), 404
-
-        person = world.population.get_person(person_id)
-        if not person:
-            return jsonify({'error': f'Person {person_id} not found'}), 404
-
-        # Get geographical unit info
-        geo_info = None
-        if person.geographical_unit:
-            geo_info = {
-                'id': person.geographical_unit.id,
-                'name': person.geographical_unit.name,
-                'level': person.geographical_unit.level,
-                'coordinates': person.geographical_unit.coordinates
-            }
-
-        # Build activity_map representation
-        activity_map_data = {}
-        if hasattr(person, 'activity_map') and person.activity_map:
-            for activity_type, venues_by_type in person.activity_map.items():
-                activity_map_data[activity_type] = {}
-                if isinstance(venues_by_type, dict):
-                    for venue_type, subsets in venues_by_type.items():
-                        subset_list = []
-                        if subsets:
-                            for subset in (subsets if isinstance(subsets, list) else [subsets]):
-                                if subset:
-                                    subset_info = {
-                                        'subset_name': getattr(subset, 'name', 'unknown'),
-                                        'venue_id': getattr(subset.venue, 'id', None) if hasattr(subset, 'venue') else None,
-                                        'venue_name': getattr(subset.venue, 'name', 'unknown') if hasattr(subset, 'venue') else 'unknown',
-                                        'venue_type': getattr(subset.venue, 'type', venue_type) if hasattr(subset, 'venue') else venue_type
-                                    }
-                                    subset_list.append(subset_info)
-                        activity_map_data[activity_type][venue_type] = subset_list
-
-        return jsonify(_convert_numpy_types({
-            'id': person.id,
-            'age': person.age,
-            'sex': person.sex,
-            'activities': person.activities,
-            'activity_map': activity_map_data,
-            'properties': person.properties,
-            'geographical_unit': geo_info
-        }))
-
-    except Exception as e:
-        logger.error(f"Error getting person details for {person_id}: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/geography/unit/<unit_name>/people')
-def get_unit_people(unit_name):
-    """Get list of people in a geographical unit with pagination."""
-    try:
-        world = get_world()
-        if not world.geography:
-            return jsonify({'error': 'No geography data'}), 404
-
-        unit = world.geography.get_unit(unit_name)
-        if not unit:
-            return jsonify({'error': f'Unit {unit_name} not found'}), 404
-
-        # Pagination parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 50, type=int)
-        per_page = min(per_page, 200)  # Cap at 200 per page
-
-        # Get all people from unit (and optionally descendants)
-        include_descendants = request.args.get('include_descendants', 'false').lower() == 'true'
-
-        if include_descendants:
-            all_people = unit.get_people()
-        else:
-            all_people = list(unit.people) if unit.people else []
-
-        total_count = len(all_people)
-
-        # Apply pagination
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        paginated_people = all_people[start_idx:end_idx]
-
-        # Build person summaries
-        people_data = []
-        for person in paginated_people:
-            # Get primary activity info
-            primary_activity = None
-            if hasattr(person, 'activity_map') and person.activity_map:
-                if 'primary_activity' in person.activity_map:
-                    for venue_type, subsets in person.activity_map['primary_activity'].items():
-                        if subsets:
-                            subset = subsets[0] if isinstance(subsets, list) else subsets
-                            if subset and hasattr(subset, 'venue'):
-                                primary_activity = {
-                                    'type': venue_type,
-                                    'venue_name': getattr(subset.venue, 'name', 'unknown')
-                                }
-                                break
-
-            people_data.append({
-                'id': person.id,
-                'age': person.age,
-                'sex': person.sex,
-                'activities': list(person.activities) if isinstance(person.activities, set) else person.activities,
-                'primary_activity': primary_activity
-            })
-
-        return jsonify({
-            'unit_name': unit_name,
-            'total_count': total_count,
-            'page': page,
-            'per_page': per_page,
-            'total_pages': (total_count + per_page - 1) // per_page,
-            'people': people_data
-        })
-
-    except Exception as e:
-        logger.error(f"Error getting people for unit {unit_name}: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# API: Venues
-# ============================================================================
-
-@app.route('/api/venues/types')
-def get_venue_types():
-    """Get all available venue types and their counts."""
-    try:
-        world = get_world()
-        if not world.venues:
-            return jsonify({'types': []})
-
-        venue_types = {}
-        for venue_type in world.venues.get_venue_types():
-            venues = world.venues.get_venues_by_type(venue_type)
-            venue_types[venue_type] = len(venues)
-
-        return jsonify({'types': venue_types})
-
-    except Exception as e:
-        logger.error(f"Error getting venue types: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/venues/<venue_type>')
-def get_venues_by_type(venue_type):
-    """Get all venues of a specific type as GeoJSON."""
-    try:
-        world = get_world()
-        if not world.venues:
-            return jsonify({'type': 'FeatureCollection', 'features': []})
-
-        venues = world.venues.get_venues_by_type(venue_type)
-
-        features = []
-        for venue in venues:
-            if not venue.coordinates:
-                continue
-
-            lat, lon = venue.coordinates
-
-            # Count members across all subsets
-            total_members = 0
-            if hasattr(venue, 'subsets') and venue.subsets:
-                for subset in venue.subsets.values():
-                    if hasattr(subset, 'num_members'):
-                        total_members += subset.num_members
-
-            feature = {
-                'type': 'Feature',
-                'properties': {
-                    'id': int(venue.id) if hasattr(venue.id, 'item') else venue.id,
-                    'name': str(venue.name),
-                    'type': str(venue.type),
-                    'geographical_unit': str(venue.geographical_unit.name) if venue.geographical_unit else None,
-                    'num_members': int(total_members),
-                    'properties': _convert_numpy_types(venue.properties) if venue.properties else {}
-                },
-                'geometry': {
-                    'type': 'Point',
-                    # Convert numpy floats to Python floats for JSON serialization
-                    'coordinates': [float(lon), float(lat)]
-                }
-            }
-            features.append(feature)
-
-        geojson = {
-            'type': 'FeatureCollection',
-            'features': features
-        }
-
-        logger.info(f"Returned {len(features)} venues of type {venue_type}")
-        return jsonify(geojson)
-
-    except Exception as e:
-        logger.error(f"Error getting venues of type {venue_type}: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/venues/venue/<int:venue_id>')
-def get_venue_details(venue_id):
-    """Get detailed information about a specific venue."""
-    try:
-        world = get_world()
-        if not world.venues:
-            return jsonify({'error': 'No venues data'}), 404
-
-        venue = _venue_index.get(venue_id)
-        if not venue:
-            return jsonify({'error': f'Venue {venue_id} not found'}), 404
-
-        # Get geographical unit info
-        geo_info = None
-        if venue.geographical_unit:
-            geo_info = {
-                'id': venue.geographical_unit.id,
-                'name': venue.geographical_unit.name,
-                'level': venue.geographical_unit.level,
-                'coordinates': venue.geographical_unit.coordinates
-            }
-
-        # Get subset information
-        subsets_info = []
-        if hasattr(venue, 'subsets') and venue.subsets:
-            for subset_name, subset in venue.subsets.items():
-                subset_info = {
-                    'name': subset_name,
-                }
-                if hasattr(subset, 'num_members'):
-                    subset_info['num_members'] = subset.num_members
-                if hasattr(subset, 'capacity'):
-                    subset_info['capacity'] = subset.capacity
-                subsets_info.append(subset_info)
-
-        return jsonify({
-            'id': venue.id,
-            'name': venue.name,
-            'type': venue.type,
-            'coordinates': venue.coordinates,
-            'geographical_unit': geo_info,
-            'properties': venue.properties,
-            'subsets': subsets_info
-        })
-
-    except Exception as e:
-        logger.error(f"Error getting venue details for {venue_id}: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# API: Households
-# ============================================================================
-
-@app.route('/api/households/statistics')
-def get_household_statistics():
-    """Get household statistics."""
-    try:
-        world = get_world()
-        if not world.households:
-            return jsonify({'error': 'No household data'}), 404
-
-        # Calculate statistics
-        total_households = len(world.households.households)
-
-        size_distribution = defaultdict(int)
-        for household in world.households.households:
-            size = household.size() if hasattr(household, 'size') else len(household.residents)
-            size_distribution[size] += 1
-
-        return jsonify({
-            'total_households': total_households,
-            'size_distribution': dict(size_distribution),
-            'average_size': sum(k * v for k, v in size_distribution.items()) / total_households if total_households > 0 else 0
-        })
-
-    except Exception as e:
-        logger.error(f"Error getting household statistics: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# API: World Statistics
-# ============================================================================
-
-@app.route('/api/world/statistics')
-def get_world_statistics():
-    """Get comprehensive statistics about the world."""
-    try:
-        world = get_world()
-        stats = world.get_statistics()
-        # Merge in slim-mode aggregate statistics if available
-        slim_stats = getattr(world, '_slim_statistics', None)
-        if slim_stats:
-            stats['slim_statistics'] = slim_stats
-        # Convert numpy types to Python native types for JSON serialization
-        stats = _convert_numpy_types(stats)
-        return jsonify(stats)
-
-    except Exception as e:
-        logger.error(f"Error getting world statistics: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# API: Events (Simulation Event Visualization)
-# ============================================================================
-
-# Global event loader instance
-_event_loader = None
-_event_config = None
-
-
 def load_event_config(config_path=None):
     """Load event visualization configuration from YAML file."""
-    global _event_config
-
     if config_path is None:
         config_path = Path(__file__).parent / 'yaml' / 'event_visualisation.yaml'
 
     try:
         with open(config_path, 'r') as f:
-            _event_config = yaml.safe_load(f)
+            event_config = yaml.safe_load(f)
         logger.info(f"Loaded event config from {config_path}")
     except FileNotFoundError:
         logger.warning(f"Event config not found at {config_path}, using defaults")
-        _event_config = _get_default_event_config()
+        event_config = _get_default_event_config()
     except Exception as e:
         logger.error(f"Error loading event config: {e}")
-        _event_config = _get_default_event_config()
+        event_config = _get_default_event_config()
 
-    return _event_config
+    return event_config
 
 
 def _get_default_event_config():
@@ -950,170 +207,101 @@ def _get_default_event_config():
 
 def initialize_events(events_path, world=None):
     """Initialize event loader with optional world instance for geo coordinates."""
-    global _event_loader
-
     try:
-        from event_loader import load_events_with_world
-        _event_loader = load_events_with_world(events_path, world)
+        from world_map.events.event_loader import load_events_with_world
+        event_loader = load_events_with_world(events_path, world)
         logger.info(f"Event loader initialized from {events_path}")
     except Exception as e:
         logger.error(f"Failed to initialize event loader: {e}")
-        _event_loader = None
+        event_loader = None
+
+    app.config['EVENT_LOADER'] = event_loader
+
+
+def get_world():
+    """Get the current World instance."""
+    from flask import current_app
+    world = current_app.config.get('WORLD')
+    if world is None:
+        raise RuntimeError("World instance not initialized. Call create_app() first.")
+    return world
 
 
 def get_event_loader():
     """Get the event loader instance."""
-    return _event_loader
+    from flask import current_app
+    return current_app.config.get('EVENT_LOADER')
 
 
-@app.route('/api/events/config')
-def get_event_config():
-    """Get event visualization configuration."""
-    global _event_config
-    if _event_config is None:
-        load_event_config()
-    return jsonify(_event_config)
+# Create Flask app
+app = Flask(__name__)
+CORS(app)
 
 
-@app.route('/api/events/summary')
-def get_events_summary():
-    """Get summary of available events."""
-    loader = get_event_loader()
-    if loader is None:
-        return jsonify({'error': 'Events not loaded'}), 404
+def create_app(world, map_config=None, panel_config_path=None):
+    """
+    Initialize the Flask app with a World instance and optional map configuration.
 
-    return jsonify({
-        'available_types': loader.get_available_event_types(),
-        'counts': loader.get_event_summary(),
-        'time_range': loader.get_time_range()
-    })
-
-
-@app.route('/api/events/geojson/batch')
-def get_events_geojson_batch():
-    """Get GeoJSON for multiple event types in a single request.
-
-    Query params:
-        types:      repeated param — e.g. ?types=infections&types=deaths
-        time_start: float
-        time_end:   float
-        method:     'count' | 'rate'
-        cumulative: 'true' | 'false'
+    Args:
+        world: World instance to visualize
+        map_config: Dict with optional keys:
+            - background_type: 'osm' (default) or 'image'
+            - image_url: URL or path to background image (required if background_type='image')
+            - bounds: [[south, west], [north, east]] geographic bounds (required if background_type='image')
+            - attribution: Attribution text for the image
+        panel_config_path: Path to info panel YAML config (optional)
 
     Returns:
-        JSON object mapping event_type -> GeoJSON FeatureCollection
+        Flask app instance
     """
-    loader = get_event_loader()
-    if loader is None:
-        return jsonify({'error': 'Events not loaded'}), 404
+    app.config['WORLD'] = world
 
-    time_start  = request.args.get('time_start', type=float, default=0.0)
-    time_end    = request.args.get('time_end',   type=float, default=loader.time_max)
-    method      = request.args.get('method', default='count')
-    cumulative  = request.args.get('cumulative', default='false').lower() == 'true'
-    event_types = request.args.getlist('types')
+    default_map_config = {
+        'background_type': 'osm',
+        'image_url': None,
+        'bounds': None,
+        'attribution': None
+    }
+    if map_config:
+        default_map_config.update(map_config)
+    app.config['MAP_CONFIG'] = default_map_config
 
-    try:
-        results = {}
-        for event_type in event_types:
-            results[event_type] = loader.get_events_geojson(
-                event_type=event_type,
-                time_start=time_start,
-                time_end=time_end,
-                method=method,
-                cumulative=cumulative
-            )
-        return jsonify(results)
-    except Exception as e:
-        logger.error(f"Error in batch geojson: {e}")
-        return jsonify({'error': str(e)}), 500
+    # Build a flat venue index keyed by venue.id (Python memory address)
+    venue_index = {}
+    if world.venues:
+        for venue in world.venues.get_all_venues().values():
+            venue_index[venue.id] = venue
+    app.config['VENUE_INDEX'] = venue_index
 
+    # Load panel, theme, and event configuration
+    app.config['PANEL_CONFIG'] = load_panel_config(panel_config_path)
+    app.config['THEME_CONFIG'] = load_theme_config()
+    app.config['EVENT_CONFIG'] = load_event_config()
 
-@app.route('/api/events/geojson/<event_type>')
-def get_events_geojson(event_type):
-    """Get events as GeoJSON for map display."""
-    loader = get_event_loader()
-    if loader is None:
-        return jsonify({'error': 'Events not loaded'}), 404
+    logger.info(f"Initialized world map with: {world}")
+    log_cfg = {k: (v[:60] + '…' if isinstance(v, str) and len(v) > 60 else v)
+               for k, v in default_map_config.items()}
+    logger.info(f"Map configuration: {log_cfg}")
 
-    # Parse query parameters
-    time_start = request.args.get('time_start', type=float, default=0.0)
-    time_end = request.args.get('time_end', type=float, default=loader.time_max)
-    method = request.args.get('method', default='count')
-    cumulative = request.args.get('cumulative', default='false').lower() == 'true'
+    # Register blueprints
+    from world_map.routes.geography import geography_bp
+    from world_map.routes.population import population_bp
+    from world_map.routes.venues import venues_bp
+    from world_map.routes.events import events_bp
+    from world_map.routes.config_routes import config_bp
+    app.register_blueprint(geography_bp)
+    app.register_blueprint(population_bp)
+    app.register_blueprint(venues_bp)
+    app.register_blueprint(events_bp)
+    app.register_blueprint(config_bp)
 
-    try:
-        geojson = loader.get_events_geojson(
-            event_type=event_type,
-            time_start=time_start,
-            time_end=time_end,
-            method=method,
-            cumulative=cumulative
-        )
-        return jsonify(geojson)
-    except Exception as e:
-        logger.error(f"Error getting events geojson: {e}")
-        return jsonify({'error': str(e)}), 500
+    return app
 
 
-@app.route('/api/events/timeseries/<event_type>')
-def get_events_timeseries(event_type):
-    """Get daily event counts as timeseries."""
-    loader = get_event_loader()
-    if loader is None:
-        return jsonify({'error': 'Events not loaded'}), 404
-
-    try:
-        df = loader.get_daily_events_timeseries(event_type)
-        return jsonify({
-            'event_type': event_type,
-            'data': df.to_dict(orient='records')
-        })
-    except Exception as e:
-        logger.error(f"Error getting events timeseries: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/events/aggregated/<event_type>')
-def get_events_aggregated(event_type):
-    """Get aggregated events by geo_unit."""
-    loader = get_event_loader()
-    if loader is None:
-        return jsonify({'error': 'Events not loaded'}), 404
-
-    time_start = request.args.get('time_start', type=float, default=0.0)
-    time_end = request.args.get('time_end', type=float, default=loader.time_max)
-    method = request.args.get('method', default='count')
-
-    try:
-        aggregated = loader.aggregate_events_by_geo_unit(
-            event_type=event_type,
-            time_start=time_start,
-            time_end=time_end,
-            method=method
-        )
-
-        # Convert to serializable format
-        result = {}
-        for geo_unit_id, data in aggregated.items():
-            result[str(geo_unit_id)] = _convert_numpy_types(data)
-
-        return jsonify({
-            'event_type': event_type,
-            'time_start': time_start,
-            'time_end': time_end,
-            'method': method,
-            'data': result
-        })
-    except Exception as e:
-        logger.error(f"Error getting aggregated events: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/events')
-def events_page():
-    """Serve the events visualization page."""
-    return render_template('events_map.html')
+# Keep initialize_app as an alias for backwards compatibility
+def initialize_app(world, map_config=None, panel_config_path=None):
+    """Alias for create_app() — kept for backwards compatibility."""
+    return create_app(world, map_config=map_config, panel_config_path=panel_config_path)
 
 
 # ============================================================================
