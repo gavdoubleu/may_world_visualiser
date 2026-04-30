@@ -1,0 +1,85 @@
+INFO:world_loader:============================================================
+INFO:world_loader:LOADING WORLD FROM HDF5 (slim mode)
+INFO:world_loader:============================================================
+INFO:world_loader:Input file: data/world_state_medieval.h5
+INFO:world_loader:  Geography units: 19,752
+INFO:world_loader:  People:          4,751,126
+INFO:world_loader:  Venues:          1,930,282
+INFO:world_loader:Loading geography...
+INFO:world_loader:  Loaded 19752 geographical units
+INFO:world_loader:Loading population...
+INFO:world_loader:    475,112/4,751,126 people (9%)
+INFO:world_loader:    950,224/4,751,126 people (19%)
+INFO:world_loader:    1,425,336/4,751,126 people (29%)
+INFO:world_loader:    1,900,448/4,751,126 people (39%)
+INFO:world_loader:    2,375,560/4,751,126 people (49%)
+INFO:world_loader:    2,850,672/4,751,126 people (59%)
+INFO:world_loader:    3,325,784/4,751,126 people (69%)
+INFO:world_loader:    3,800,896/4,751,126 people (79%)
+INFO:world_loader:    4,276,008/4,751,126 people (89%)
+INFO:world_loader:    4,751,120/4,751,126 people (99%)
+INFO:world_loader:    4,751,126/4,751,126 people (100%)
+INFO:world_loader:  Loaded 4,751,126 people
+INFO:world_loader:Population loaded in 9.47s
+INFO:world_loader:Loading venues...
+INFO:world_loader:  Loaded 1,930,282 venues
+INFO:world_loader:  Loaded 2,837,264 subsets
+INFO:world_loader:Computing slim statistics...
+INFO:world_loader:Computing per-unit statistics...
+INFO:world_loader:Per-unit statistics computed for 19752 units.
+INFO:world_loader:Load complete: <WorldData: 19752 units, 4,751,126 people, 1,930,282 venues>
+INFO:world_map.app:Loaded panel config from /home/gavin/Documents/MAY2/may_world_visualiser/world_map/yaml/info_panel_config.yaml
+INFO:world_map.app:Loaded theme 'dark_scientific' from /home/gavin/Documents/MAY2/may_world_visualiser/world_map/yaml/themes/dark_scientific.yaml
+INFO:world_map.app:Loaded event config from /home/gavin/Documents/MAY2/may_world_visualiser/world_map/yaml/event_visualisation.yaml
+INFO:world_map.app:Loaded 19710 geo_unit display names from /home/gavin/Documents/MAY2/may_world_visualiser/data/Geo_unit_names.csv
+INFO:world_map.app:Initialized world map with: <WorldData: 19752 units, 4,751,126 people, 1,930,282 venues>
+INFO:world_map.app:Map configuration: {'background_type': 'image', 'image_url': '/static/map_images/image1.png', 'bounds': [[49.0, -7.0], [56.0, 2.0]], 'attribution': 'Custom Map Image'}
+INFO:world_map.app:Loaded event config from /home/gavin/Documents/MAY2/may_world_visualiser/world_map/yaml/event_visualisation.yaml
+INFO:world_map.events.event_loader:Loading events from ../../Black_Death/Animations/animations/data/simulation_events_sailors.h5
+INFO:world_map.events.event_loader:  Loaded 1893919 infections
+INFO:world_map.events.event_loader:  Loaded 1631493 deaths
+INFO:world_map.events.event_loader:  hospital_admissions not found in file
+INFO:world_map.events.event_loader:  icu_admissions not found in file
+INFO:world_map.events.event_loader:  hospital_discharges not found in file
+INFO:world_map.events.event_loader:  Loaded 5947605 symptom_changes
+INFO:world_map.events.event_loader:  Time range: 0.0 - 730.5
+INFO:world_map.events.event_loader:  Loaded 1910636 venue mappings
+INFO:world_map.events.event_loader:  Loaded 1889861 person mappings
+INFO:world_map.events.event_loader:  Events pre-sorted by time for fast window queries
+INFO:world_map.events.event_loader:  Built venue lookup array (size 1,910,635)
+INFO:world_map.events.event_loader:  Built person lookup array (size 4,751,121)
+INFO:world_map.events.event_loader:Numba JIT available — event aggregation will use compiled kernels
+INFO:world_map.events.event_loader:Set 19751 geo_unit coordinates from world
+INFO:world_map.app:Event loader initialized from ../../Black_Death/Animations/animations/data/simulation_events_sailors.h5
+Loading world from: data/world_state_medieval.h5
+Copied image to: /home/gavin/Documents/MAY2/may_world_visualiser/world_map/static/map_images/image1.png
+
+Map Configuration:
+  Type: Custom Image
+  Image: data/image1.png
+  URL: /static/map_images/image1.png
+  Bounds: [[49.0, -7.0], [56.0, 2.0]]
+  Attribution: Custom Map Image
+
+Loading events from: ../../Black_Death/Animations/animations/data/simulation_events_sailors.h5
+Events loaded successfully!
+
+============================================================
+🗺️  World Map Visualization
+============================================================
+
+Starting server at http://127.0.0.1:5000
+
+Press Ctrl+C to stop the server
+============================================================
+
+ * Serving Flask app 'world_map.app'
+ * Debug mode: on
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug:127.0.0.1 - - [30/Apr/2026 23:31:28] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [30/Apr/2026 23:31:28] "GET /api/theme.css HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [30/Apr/2026 23:31:28] "GET /static/images/June_logo_white.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [30/Apr/2026 23:31:29] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:werkzeug:127.0.0.1 - - [30/Apr/2026 23:31:30] "GET /api/theme HTTP/1.1" 200 -

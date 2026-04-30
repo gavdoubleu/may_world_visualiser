@@ -1,3 +1,7 @@
+*~
+CLAUDE.md
+.worktrees/
 data/
 *.h5
 *.jpg
+outputs/
