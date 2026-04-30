@@ -1,0 +1,20 @@
+title: "World Map Visualizer"
+subtitle: null
+logo_path: null
+
+colors:
+  bg:             '#faf9f6'
+  surface:        '#f5f3ee'
+  surface_raised: '#ffffff'
+  border:         '#e0d8c8'
+  text:           '#2c3e50'
+  text_muted:     '#7f8c8d'
+  accent:         '#1c2b3a'
+  header_bg:      '#1c2b3a'
+  header_text:    '#ffffff'
+
+fonts:
+  display:      'Playfair Display'
+  display_file: 'PlayfairDisplay-SemiBold.woff2'
+  body:         'Source Sans 3'
+  body_file:    'SourceSans3-Regular.woff2'

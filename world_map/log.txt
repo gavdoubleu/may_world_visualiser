@@ -1,0 +1,273 @@
+INFO:app:Loaded panel config from /home/gavin/Documents/MAY2/may_world_visualiser/world_map/yaml/info_panel_config.yaml
+INFO:app:Loaded theme 'dark_scientific' from /home/gavin/Documents/MAY2/may_world_visualiser/world_map/yaml/themes/dark_scientific.yaml
+INFO:app:Initialized world map with: <WorldData: 19752 units, 4,751,126 people, 1,930,282 venues>
+INFO:app:Map configuration: {'background_type': 'image', 'image_url': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAADM8AABBhCAYAAA…', 'bounds': [[49.0, -7.0], [56.0, 2.0]], 'attribution': 'Topological Map'}
+============================================================
+  World Map Static Exporter
+============================================================
+
+[1/5] Loading world from ../data/world_state_medieval.h5 ...
+  World loaded: <WorldData: 19752 units, 4,751,126 people, 1,930,282 venues>
+  Image embedded as base64 (9654 KB → 12872 KB base64)
+
+[2/6] Collecting world data (max 300 MB) ...
+  Geography units: 19752
+  Fetching core configuration ...
+INFO:app:Loaded event config from /home/gavin/Documents/MAY2/may_world_visualiser/world_map/yaml/event_visualisation.yaml
+  Fetching geography GeoJSON ...
+    Level MBD_Temp_ID ...INFO:app:Returned 19710 features for level MBD_Temp_ID
+ 19710 features, 6533 KB
+    Level County ...INFO:app:Returned 41 features for level County
+ 41 features, 14 KB
+    Level Country ...INFO:app:Returned 0 features for level Country
+ 0 features, 0 KB
+
+  Core data collected: 19.0 MB
+  Slim mode detected — per-unit people lists will not be embedded.
+  Fetching details for 19752 geo units ...
+    100/19752 (0%) — 19.0 MB so far
+    200/19752 (1%) — 19.1 MB so far
+    300/19752 (1%) — 19.2 MB so far
+    400/19752 (2%) — 19.2 MB so far
+    500/19752 (2%) — 19.3 MB so far
+    600/19752 (3%) — 19.4 MB so far
+    700/19752 (3%) — 19.4 MB so far
+    800/19752 (4%) — 19.5 MB so far
+    900/19752 (4%) — 19.6 MB so far
+    1000/19752 (5%) — 19.6 MB so far
+    1100/19752 (5%) — 19.7 MB so far
+    1200/19752 (6%) — 19.8 MB so far
+    1300/19752 (6%) — 19.8 MB so far
+    1400/19752 (7%) — 19.9 MB so far
+    1500/19752 (7%) — 20.0 MB so far
+    1600/19752 (8%) — 20.0 MB so far
+    1700/19752 (8%) — 20.1 MB so far
+    1800/19752 (9%) — 20.2 MB so far
+    1900/19752 (9%) — 20.2 MB so far
+    2000/19752 (10%) — 20.3 MB so far
+    2100/19752 (10%) — 20.3 MB so far
+    2200/19752 (11%) — 20.4 MB so far
+    2300/19752 (11%) — 20.5 MB so far
+    2400/19752 (12%) — 20.5 MB so far
+    2500/19752 (12%) — 20.6 MB so far
+    2600/19752 (13%) — 20.7 MB so far
+    2700/19752 (13%) — 20.7 MB so far
+    2800/19752 (14%) — 20.8 MB so far
+    2900/19752 (14%) — 20.9 MB so far
+    3000/19752 (15%) — 20.9 MB so far
+    3100/19752 (15%) — 21.0 MB so far
+    3200/19752 (16%) — 21.1 MB so far
+    3300/19752 (16%) — 21.1 MB so far
+    3400/19752 (17%) — 21.2 MB so far
+    3500/19752 (17%) — 21.3 MB so far
+    3600/19752 (18%) — 21.3 MB so far
+    3700/19752 (18%) — 21.4 MB so far
+    3800/19752 (19%) — 21.5 MB so far
+    3900/19752 (19%) — 21.5 MB so far
+    4000/19752 (20%) — 21.6 MB so far
+    4100/19752 (20%) — 21.7 MB so far
+    4200/19752 (21%) — 21.7 MB so far
+    4300/19752 (21%) — 21.8 MB so far
+    4400/19752 (22%) — 21.9 MB so far
+    4500/19752 (22%) — 21.9 MB so far
+    4600/19752 (23%) — 22.0 MB so far
+    4700/19752 (23%) — 22.1 MB so far
+    4800/19752 (24%) — 22.1 MB so far
+    4900/19752 (24%) — 22.2 MB so far
+    5000/19752 (25%) — 22.3 MB so far
+    5100/19752 (25%) — 22.3 MB so far
+    5200/19752 (26%) — 22.4 MB so far
+    5300/19752 (26%) — 22.5 MB so far
+    5400/19752 (27%) — 22.5 MB so far
+    5500/19752 (27%) — 22.6 MB so far
+    5600/19752 (28%) — 22.7 MB so far
+    5700/19752 (28%) — 22.7 MB so far
+    5800/19752 (29%) — 22.8 MB so far
+    5900/19752 (29%) — 22.9 MB so far
+    6000/19752 (30%) — 22.9 MB so far
+    6100/19752 (30%) — 23.0 MB so far
+    6200/19752 (31%) — 23.0 MB so far
+    6300/19752 (31%) — 23.1 MB so far
+    6400/19752 (32%) — 23.2 MB so far
+    6500/19752 (32%) — 23.2 MB so far
+    6600/19752 (33%) — 23.3 MB so far
+    6700/19752 (33%) — 23.4 MB so far
+    6800/19752 (34%) — 23.4 MB so far
+    6900/19752 (34%) — 23.5 MB so far
+    7000/19752 (35%) — 23.6 MB so far
+    7100/19752 (35%) — 23.6 MB so far
+    7200/19752 (36%) — 23.7 MB so far
+    7300/19752 (36%) — 23.8 MB so far
+    7400/19752 (37%) — 23.8 MB so far
+    7500/19752 (37%) — 23.9 MB so far
+    7600/19752 (38%) — 24.0 MB so far
+    7700/19752 (38%) — 24.0 MB so far
+    7800/19752 (39%) — 24.1 MB so far
+    7900/19752 (39%) — 24.2 MB so far
+    8000/19752 (40%) — 24.2 MB so far
+    8100/19752 (41%) — 24.3 MB so far
+    8200/19752 (41%) — 24.4 MB so far
+    8300/19752 (42%) — 24.4 MB so far
+    8400/19752 (42%) — 24.5 MB so far
+    8500/19752 (43%) — 24.6 MB so far
+    8600/19752 (43%) — 24.6 MB so far
+    8700/19752 (44%) — 24.7 MB so far
+    8800/19752 (44%) — 24.8 MB so far
+    8900/19752 (45%) — 24.8 MB so far
+    9000/19752 (45%) — 24.9 MB so far
+    9100/19752 (46%) — 25.0 MB so far
+    9200/19752 (46%) — 25.0 MB so far
+    9300/19752 (47%) — 25.1 MB so far
+    9400/19752 (47%) — 25.1 MB so far
+    9500/19752 (48%) — 25.2 MB so far
+    9600/19752 (48%) — 25.3 MB so far
+    9700/19752 (49%) — 25.3 MB so far
+    9800/19752 (49%) — 25.4 MB so far
+    9900/19752 (50%) — 25.5 MB so far
+    10000/19752 (50%) — 25.5 MB so far
+    10100/19752 (51%) — 25.6 MB so far
+    10200/19752 (51%) — 25.7 MB so far
+    10300/19752 (52%) — 25.7 MB so far
+    10400/19752 (52%) — 25.8 MB so far
+    10500/19752 (53%) — 25.9 MB so far
+    10600/19752 (53%) — 25.9 MB so far
+    10700/19752 (54%) — 26.0 MB so far
+    10800/19752 (54%) — 26.1 MB so far
+    10900/19752 (55%) — 26.1 MB so far
+    11000/19752 (55%) — 26.2 MB so far
+    11100/19752 (56%) — 26.3 MB so far
+    11200/19752 (56%) — 26.3 MB so far
+    11300/19752 (57%) — 26.4 MB so far
+    11400/19752 (57%) — 26.5 MB so far
+    11500/19752 (58%) — 26.5 MB so far
+    11600/19752 (58%) — 26.6 MB so far
+    11700/19752 (59%) — 26.7 MB so far
+    11800/19752 (59%) — 26.7 MB so far
+    11900/19752 (60%) — 26.8 MB so far
+    12000/19752 (60%) — 26.8 MB so far
+    12100/19752 (61%) — 26.9 MB so far
+    12200/19752 (61%) — 27.0 MB so far
+    12300/19752 (62%) — 27.0 MB so far
+    12400/19752 (62%) — 27.1 MB so far
+    12500/19752 (63%) — 27.2 MB so far
+    12600/19752 (63%) — 27.2 MB so far
+    12700/19752 (64%) — 27.3 MB so far
+    12800/19752 (64%) — 27.4 MB so far
+    12900/19752 (65%) — 27.4 MB so far
+    13000/19752 (65%) — 27.5 MB so far
+    13100/19752 (66%) — 27.6 MB so far
+    13200/19752 (66%) — 27.6 MB so far
+    13300/19752 (67%) — 27.7 MB so far
+    13400/19752 (67%) — 27.8 MB so far
+    13500/19752 (68%) — 27.8 MB so far
+    13600/19752 (68%) — 27.9 MB so far
+    13700/19752 (69%) — 28.0 MB so far
+    13800/19752 (69%) — 28.0 MB so far
+    13900/19752 (70%) — 28.1 MB so far
+    14000/19752 (70%) — 28.2 MB so far
+    14100/19752 (71%) — 28.2 MB so far
+    14200/19752 (71%) — 28.3 MB so far
+    14300/19752 (72%) — 28.4 MB so far
+    14400/19752 (72%) — 28.4 MB so far
+    14500/19752 (73%) — 28.5 MB so far
+    14600/19752 (73%) — 28.6 MB so far
+    14700/19752 (74%) — 28.6 MB so far
+    14800/19752 (74%) — 28.7 MB so far
+    14900/19752 (75%) — 28.8 MB so far
+    15000/19752 (75%) — 28.8 MB so far
+    15100/19752 (76%) — 28.9 MB so far
+    15200/19752 (76%) — 28.9 MB so far
+    15300/19752 (77%) — 29.0 MB so far
+    15400/19752 (77%) — 29.1 MB so far
+    15500/19752 (78%) — 29.1 MB so far
+    15600/19752 (78%) — 29.2 MB so far
+    15700/19752 (79%) — 29.3 MB so far
+    15800/19752 (79%) — 29.3 MB so far
+    15900/19752 (80%) — 29.4 MB so far
+    16000/19752 (81%) — 29.5 MB so far
+    16100/19752 (81%) — 29.5 MB so far
+    16200/19752 (82%) — 29.6 MB so far
+    16300/19752 (82%) — 29.7 MB so far
+    16400/19752 (83%) — 29.7 MB so far
+    16500/19752 (83%) — 29.8 MB so far
+    16600/19752 (84%) — 29.9 MB so far
+    16700/19752 (84%) — 29.9 MB so far
+    16800/19752 (85%) — 30.0 MB so far
+    16900/19752 (85%) — 30.1 MB so far
+    17000/19752 (86%) — 30.1 MB so far
+    17100/19752 (86%) — 30.2 MB so far
+    17200/19752 (87%) — 30.3 MB so far
+    17300/19752 (87%) — 30.3 MB so far
+    17400/19752 (88%) — 30.4 MB so far
+    17500/19752 (88%) — 30.5 MB so far
+    17600/19752 (89%) — 30.5 MB so far
+    17700/19752 (89%) — 30.6 MB so far
+    17800/19752 (90%) — 30.7 MB so far
+    17900/19752 (90%) — 30.7 MB so far
+    18000/19752 (91%) — 30.8 MB so far
+    18100/19752 (91%) — 30.9 MB so far
+    18200/19752 (92%) — 30.9 MB so far
+    18300/19752 (92%) — 31.0 MB so far
+    18400/19752 (93%) — 31.1 MB so far
+    18500/19752 (93%) — 31.1 MB so far
+    18600/19752 (94%) — 31.2 MB so far
+    18700/19752 (94%) — 31.3 MB so far
+    18800/19752 (95%) — 31.3 MB so far
+    18900/19752 (95%) — 31.4 MB so far
+    19000/19752 (96%) — 31.5 MB so far
+    19100/19752 (96%) — 31.5 MB so far
+    19200/19752 (97%) — 31.6 MB so far
+    19300/19752 (97%) — 31.7 MB so far
+    19400/19752 (98%) — 31.7 MB so far
+    19500/19752 (98%) — 31.8 MB so far
+    19600/19752 (99%) — 31.9 MB so far
+    19700/19752 (99%) — 31.9 MB so far
+    19752/19752 (100%) — 33.5 MB so far
+  Unit details: 19752 / 19752 units embedded
+
+  Total embedded data: 33.5 MB
+
+[2b/5] Collecting events data from ../../../Black_Death/Animations/animations/data/simulation_events_sailors.h5 ...
+  Loading events from ../../../Black_Death/Animations/animations/data/simulation_events_sailors.h5 ...
+INFO:event_loader:Loading events from ../../../Black_Death/Animations/animations/data/simulation_events_sailors.h5
+INFO:event_loader:  Loaded 1893919 infections
+INFO:event_loader:  Loaded 1631493 deaths
+INFO:event_loader:  hospital_admissions not found in file
+INFO:event_loader:  icu_admissions not found in file
+INFO:event_loader:  hospital_discharges not found in file
+INFO:event_loader:  Loaded 5947605 symptom_changes
+INFO:event_loader:  Time range: 0.0 - 730.5
+INFO:event_loader:  Loaded 1910636 venue mappings
+INFO:event_loader:  Loaded 1889861 person mappings
+INFO:event_loader:  Events pre-sorted by time for fast window queries
+INFO:event_loader:  Built venue lookup array (size 1,910,635)
+INFO:event_loader:  Built person lookup array (size 4,751,121)
+INFO:event_loader:Numba JIT available — event aggregation will use compiled kernels
+INFO:event_loader:Set 19751 geo_unit coordinates from world
+  Available types: ['infections', 'deaths', 'symptom_changes']
+  Time range: 0.0 – 730.5
+  Steps: 731 (step=1.0, rolling_window=1.0)
+  Baking 'infections' (731 steps)... 7067 KB
+  Baking 'deaths' (731 steps)... 7119 KB
+  Baking 'symptom_changes' (731 steps)... 11202 KB
+  Total events data: 24.8 MB
+  Events embedded successfully.
+
+[3/5] Reading static files ...
+  style.css, events.css, app.js, events.js — OK
+  [theme] Loaded theme "dark_scientific"
+
+[4/5] Downloading Leaflet 1.9.4 for offline embedding ...
+    Downloading https://unpkg.com/leaflet@1.9.4/dist/leaflet.css ... 14 KB
+    Downloading https://unpkg.com/leaflet@1.9.4/dist/leaflet.js ... 144 KB
+
+[5/5] Building HTML ...
+
+============================================================
+  Export complete!
+  Output : /home/gavin/Documents/MAY2/may_world_visualiser/world_map/medieval_map.html
+  Size   : 60.2 MB
+  Mode   : offline (no internet required to view)
+============================================================
+
+To view: open medieval_map.html in any modern browser.
