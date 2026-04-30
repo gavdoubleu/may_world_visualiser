@@ -222,7 +222,7 @@ Examples:
             try:
                 from app import initialize_events, load_event_config
                 load_event_config()
-                initialize_events(str(events_path), world)
+                initialize_events(str(events_path), app, world)
                 print("Events loaded successfully!")
             except Exception as e:
                 print(f"WARNING: Failed to load events: {e}")
