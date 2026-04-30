@@ -7,7 +7,7 @@ from world_map.app import _convert_numpy_types
 
 logger = logging.getLogger(__name__)
 
-events_bp = Blueprint('events_api', __name__)
+events_bp = Blueprint('events', __name__)
 
 
 @events_bp.route('/api/events/config')
