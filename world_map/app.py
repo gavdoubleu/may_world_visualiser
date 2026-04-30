@@ -61,6 +61,48 @@ def load_theme_config(app_config_path=None):
     return theme_config
 
 
+def _load_geo_unit_names(world_map_dir: Path) -> dict | None:
+    """Load TEMPID → display name mapping from CSV configured in app_config.yaml.
+
+    Returns a dict keyed by TEMPID string, or None if the feature is disabled.
+    """
+    import csv
+    app_config_path = world_map_dir / 'yaml' / 'app_config.yaml'
+    try:
+        with open(app_config_path, 'r') as f:
+            app_config = yaml.safe_load(f)
+    except FileNotFoundError:
+        return None
+
+    cfg = app_config.get('geo_unit_names', {})
+    if not cfg.get('enabled', False):
+        return None
+
+    csv_path = Path(cfg.get('csv_path', ''))
+    if not csv_path.is_absolute():
+        csv_path = world_map_dir.parent / csv_path
+
+    id_col = cfg.get('id_column', 'MBD_Temp_ID')
+    name_col = cfg.get('name_column', 'Name')
+
+    try:
+        mapping = {}
+        with open(csv_path, newline='', encoding='utf-8') as f:
+            for row in csv.DictReader(f):
+                tempid = row.get(id_col, '').strip()
+                name = row.get(name_col, '').strip()
+                if tempid:
+                    mapping[tempid] = name
+        logger.info(f"Loaded {len(mapping)} geo_unit display names from {csv_path}")
+        return mapping
+    except FileNotFoundError:
+        logger.warning(f"geo_unit_names csv not found: {csv_path}")
+        return None
+    except Exception as exc:
+        logger.error(f"Error loading geo_unit_names csv: {exc}")
+        return None
+
+
 def _convert_numpy_types(obj):
     """Recursively convert numpy types to Python native types for JSON serialization."""
     import numpy as np
@@ -274,6 +316,10 @@ def create_app(world, map_config=None, panel_config_path=None):
     app.config['PANEL_CONFIG'] = load_panel_config(panel_config_path)
     app.config['THEME_CONFIG'] = load_theme_config()
     app.config['EVENT_CONFIG'] = load_event_config()
+
+    geo_unit_names = _load_geo_unit_names(Path(__file__).parent)
+    app.config['GEO_UNIT_NAMES'] = geo_unit_names
+    app.config['GEO_UNIT_NAMES_ENABLED'] = geo_unit_names is not None
 
     logger.info(f"Initialized world map with: {world}")
     log_cfg = {k: (v[:60] + '…' if isinstance(v, str) and len(v) > 60 else v)

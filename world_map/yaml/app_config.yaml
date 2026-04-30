@@ -1,1 +1,7 @@
 theme: dark_scientific   # filename (without .yaml) inside yaml/themes/ clean_minimal
+
+geo_unit_names:
+  enabled: true
+  csv_path: "data/Geo_unit_names.csv"   # relative to project root
+  id_column: "MBD_Temp_ID"
+  name_column: "Name"

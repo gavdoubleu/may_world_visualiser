@@ -200,6 +200,24 @@ header h1 {
     color: var(--theme-accent);
 }
 
+#info-content h2.unit-display-name {
+    margin-bottom: 4px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.unit-tempid {
+    font-size: 0.75em;
+    opacity: 0.55;
+    margin-top: 0;
+    margin-bottom: 14px;
+    letter-spacing: 0.03em;
+}
+
+.unit-tempid--missing {
+    font-style: italic;
+}
+
 #info-content h3 {
     font-size: 1.1rem;
     margin-top: 20px;

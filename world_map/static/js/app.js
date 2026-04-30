@@ -611,9 +611,16 @@ function buildDetailPanel(data, panelType) {
     let html = '';
 
     // Title
-    const titleField = panelConfig.title_field || 'name';
-    const title = getFieldValue(data, titleField);
-    html += `<h2>${title}</h2>`;
+    if (data.display_name) {
+        html += `<h2 class="unit-display-name">${data.display_name}</h2>`;
+        html += `<p class="unit-tempid">${data.name}</p>`;
+    } else if (data.display_name_enabled) {
+        html += `<h2>${data.name}</h2>`;
+        html += `<p class="unit-tempid unit-tempid--missing">[no name]</p>`;
+    } else {
+        const titleField = panelConfig.title_field || 'name';
+        html += `<h2>${getFieldValue(data, titleField)}</h2>`;
+    }
 
     // Sections
     const sections = panelConfig.detail_sections || [];
