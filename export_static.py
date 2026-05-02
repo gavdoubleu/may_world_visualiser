@@ -60,6 +60,9 @@ LEAFLET_VERSION = '1.9.4'
 LEAFLET_JS_URL = f'https://unpkg.com/leaflet@{LEAFLET_VERSION}/dist/leaflet.js'
 LEAFLET_CSS_URL = f'https://unpkg.com/leaflet@{LEAFLET_VERSION}/dist/leaflet.css'
 
+PROJ4_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.min.js'
+PROJ4LEAFLET_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js'
+
 DEFAULT_MAX_SIZE_MB = 80
 
 
@@ -539,6 +542,8 @@ def _build_html(
     js_events: str,
     leaflet_js: str | None,
     leaflet_css: str | None,
+    proj4_js: str | None,
+    proj4leaflet_js: str | None,
     title: str = "World Map Visualization",
     theme: dict | None = None,
     theme_css: str = "",
@@ -557,6 +562,13 @@ def _build_html(
         cdn_base = f'https://unpkg.com/leaflet@{LEAFLET_VERSION}/dist/leaflet'
         leaflet_css_block = f'<link rel="stylesheet" href="{cdn_base}.css" />'
         leaflet_js_block = f'<script src="{cdn_base}.js"></script>'
+
+    if proj4_js and proj4leaflet_js:
+        proj4_js_block = f'<script>\n{proj4_js}\n</script>'
+        proj4leaflet_js_block = f'<script>\n{proj4leaflet_js}\n</script>'
+    else:
+        proj4_js_block = f'<script src="{PROJ4_JS_URL}"></script>'
+        proj4leaflet_js_block = f'<script src="{PROJ4LEAFLET_JS_URL}"></script>'
 
     # Build logo element — embed as base64 if logo_path is set
     logo_html = ''
@@ -637,6 +649,8 @@ window.STATIC_WORLD_DATA = {data_json};
     </script>
 
     {leaflet_js_block}
+    {proj4_js_block}
+    {proj4leaflet_js_block}
 
     <!-- Application JavaScript -->
     <script>
@@ -813,10 +827,44 @@ def main() -> None:
     n_steps = '6' if args.events_file else '5'
     print(f'\n[2/{n_steps}] Collecting world data (max {args.max_size_mb:.0f} MB) ...')
 
-    from world_map.app import create_app
+    from world_map.app import create_app, _load_app_config
 
     flask_app = create_app(world, map_config=map_config)
     flask_app.config['TESTING'] = True
+
+    # -- Projection info and bounds consistency / reprojection -----------------
+    _app_cfg    = _load_app_config(WORLD_MAP_DIR)
+    _proj_cfg   = _app_cfg.get('projection', {})
+    _bounds_epsg = int(_proj_cfg.get('bounds_epsg', 4326))
+    _projection  = flask_app.config['PROJECTION']
+    print(f'  Marker projection: {_projection.name} (EPSG:{_projection.native_epsg})')
+
+    if args.map_background == 'image':
+        print(f'  Image bounds EPSG: {_bounds_epsg}')
+        if _bounds_epsg != _projection.native_epsg:
+            print(
+                f'  WARNING: bounds_epsg ({_bounds_epsg}) does not match marker '
+                f'projection (EPSG:{_projection.native_epsg}). '
+                f'Background image may be offset from data markers. '
+                f'Set projection.bounds_epsg: {_projection.native_epsg} in '
+                f'app_config.yaml for pixel-perfect alignment.'
+            )
+        if _bounds_epsg != 4326:
+            from pyproj import Transformer as _Transformer
+            _t = _Transformer.from_crs(
+                f'EPSG:{_bounds_epsg}', 'EPSG:4326', always_xy=True
+            )
+            _south, _west = map_config['bounds'][0]
+            _north, _east = map_config['bounds'][1]
+            _west_geo, _south_geo = _t.transform(_west, _south)
+            _east_geo, _north_geo = _t.transform(_east, _north)
+            map_config['bounds'] = [[_south_geo, _west_geo], [_north_geo, _east_geo]]
+            flask_app.config['MAP_CONFIG']['bounds'] = map_config['bounds']
+            print(
+                f'  Bounds reprojected EPSG:{_bounds_epsg} → WGS84: '
+                f'N={_north_geo:.5f} E={_east_geo:.5f} '
+                f'S={_south_geo:.5f} W={_west_geo:.5f}'
+            )
 
     # Build the full lists of unit names and venue IDs needed for detail pages
     geography_units_all: list[str] = []
@@ -860,16 +908,20 @@ def main() -> None:
     theme     = _load_theme(WORLD_MAP_DIR)
     theme_css = _build_theme_css(theme, static_dir)
 
-    # ---- [4] Leaflet ---------------------------------------------------------
+    # ---- [4] Leaflet + proj4 -------------------------------------------------
     leaflet_js: str | None = None
     leaflet_css: str | None = None
+    proj4_js: str | None = None
+    proj4leaflet_js: str | None = None
 
     if not args.cdn:
-        print(f'\n[4/5] Downloading Leaflet {LEAFLET_VERSION} for offline embedding ...')
-        leaflet_css = _download(LEAFLET_CSS_URL)
-        leaflet_js  = _download(LEAFLET_JS_URL)
+        print(f'\n[4/5] Downloading libraries for offline embedding ...')
+        leaflet_css     = _download(LEAFLET_CSS_URL)
+        leaflet_js      = _download(LEAFLET_JS_URL)
+        proj4_js        = _download(PROJ4_JS_URL)
+        proj4leaflet_js = _download(PROJ4LEAFLET_JS_URL)
     else:
-        print(f'\n[4/5] CDN mode — Leaflet will load from unpkg.com at view time.')
+        print(f'\n[4/5] CDN mode — Leaflet and proj4 will load from CDN at view time.')
 
     # ---- [5] Build HTML ------------------------------------------------------
     print('\n[5/5] Building HTML ...')
@@ -881,6 +933,8 @@ def main() -> None:
         js_events=js_events,
         leaflet_js=leaflet_js,
         leaflet_css=leaflet_css,
+        proj4_js=proj4_js,
+        proj4leaflet_js=proj4leaflet_js,
         title=args.title,
         theme=theme,
         theme_css=theme_css,

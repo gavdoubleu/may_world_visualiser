@@ -36,6 +36,19 @@ def load_panel_config(config_path=None):
     return panel_config
 
 
+def _load_app_config(world_map_dir: Path | None = None) -> dict:
+    """Load and return the parsed app_config.yaml dict."""
+    if world_map_dir is None:
+        world_map_dir = Path(__file__).parent
+    config_path = world_map_dir / 'yaml' / 'app_config.yaml'
+    try:
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        logger.warning(f"app_config.yaml not found at {config_path}, using defaults")
+        return {}
+
+
 def load_theme_config(app_config_path=None):
     """Load theme from app_config.yaml, then from yaml/themes/{theme}.yaml."""
     if app_config_path is None:
@@ -320,6 +333,34 @@ def create_app(world, map_config=None, panel_config_path=None):
     geo_unit_names = _load_geo_unit_names(Path(__file__).parent)
     app.config['GEO_UNIT_NAMES'] = geo_unit_names
     app.config['GEO_UNIT_NAMES_ENABLED'] = geo_unit_names is not None
+
+    # Build map projection config from app_config.yaml
+    from world_map.projection import build as _build_projection, MapProjectionConfig
+    _app_cfg = _load_app_config(Path(__file__).parent)
+    _proj_cfg = _app_cfg.get('projection', {})
+    _proj_type = _proj_cfg.get('type', 'web_mercator')
+    _proj_kwargs = {k: v for k, v in _proj_cfg.items() if k not in ('type', 'bounds_epsg')}
+    try:
+        _projection: MapProjectionConfig = _build_projection(_proj_type, **_proj_kwargs)
+    except (KeyError, ImportError) as _exc:
+        logger.warning(f"Projection init failed ({_exc}); using web_mercator")
+        from world_map.projection.web_mercator import WebMercatorConfig
+        _projection = WebMercatorConfig()
+
+    if world.geography:
+        _all_coords = [
+            unit.coordinates
+            for level in world.geography.levels
+            for unit in world.geography.get_units_by_level(level).values()
+            if unit.coordinates
+        ]
+        if _all_coords:
+            _lats, _lons = zip(*_all_coords)
+            _projection.seed_from_coordinates(list(_lats), list(_lons))
+
+    app.config['PROJECTION'] = _projection
+    default_map_config['crs'] = _projection.leaflet_crs_spec()
+    logger.info(f"Map projection: {_projection.name} (EPSG:{_projection.native_epsg})")
 
     logger.info(f"Initialized world map with: {world}")
     log_cfg = {k: (v[:60] + '…' if isinstance(v, str) and len(v) > 60 else v)

@@ -1,5 +1,13 @@
 theme: dark_scientific   # filename (without .yaml) inside yaml/themes/ clean_minimal
 
+# Coordinate projection for map display. Omit this block for default (web_mercator).
+# type options: 'web_mercator' (default), 'utm'
+# Note: UTM display requires an image overlay background. OSM tiles are Web Mercator only.
+projection:
+  type: utm
+  zone: 30
+  bounds_epsg: 32630
+
 geo_unit_names:
   enabled: true
   csv_path: "data/Geo_unit_names.csv"   # relative to project root

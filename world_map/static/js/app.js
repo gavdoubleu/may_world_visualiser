@@ -96,6 +96,41 @@ function getDefaultPanelConfig() {
 // MAP INITIALIZATION
 // =============================================================================
 
+function _showProjectionWarning(message) {
+    console.error('PROJECTION WARNING: ' + message);
+    const div = document.createElement('div');
+    div.style.cssText = (
+        'position:fixed;top:0;left:0;right:0;z-index:9999;' +
+        'background:#b00;color:#fff;padding:10px 16px;font-weight:bold;' +
+        'font-family:monospace;text-align:center;'
+    );
+    div.textContent = '⚠ PROJECTION WARNING: ' + message;
+    document.body.appendChild(div);
+}
+
+function buildLeafletCRS(crsDef, warnIfFallback) {
+    if (!crsDef || crsDef.type === 'builtin') {
+        return L.CRS[(crsDef && crsDef.name) || 'EPSG3857'] || L.CRS.EPSG3857;
+    }
+    if (crsDef.type === 'proj4') {
+        if (typeof proj4 === 'undefined' || typeof L.Proj === 'undefined') {
+            var msg = 'proj4.js / Proj4Leaflet not loaded. ' +
+                'Falling back to Web Mercator (EPSG:3857). ' +
+                'Markers and background image may be misaligned.';
+            if (warnIfFallback) {
+                _showProjectionWarning(msg);
+            } else {
+                console.warn('PROJECTION: ' + msg);
+            }
+            return L.CRS.EPSG3857;
+        }
+        proj4.defs(crsDef.code, crsDef.proj4);
+        console.info('Map projection: ' + crsDef.code);
+        return new L.Proj.CRS(crsDef.code, crsDef.proj4);
+    }
+    return L.CRS.EPSG3857;
+}
+
 function initializeMap() {
     const config = state.mapConfig;
 
@@ -106,7 +141,7 @@ function initializeMap() {
         const centerLon = (west + east) / 2;
 
         state.map = L.map('map', {
-            crs: L.CRS.EPSG3857,
+            crs: buildLeafletCRS(config.crs, /* warnIfFallback */ true),
             minZoom: 1,
             maxZoom: 18,
             attributionControl: true

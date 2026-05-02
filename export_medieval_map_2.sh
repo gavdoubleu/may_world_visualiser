@@ -1,0 +1,2 @@
+python export_static.py --world-file data/world_state_medieval.h5 --map-background image --map-image data/terrain_noshade_log_UTM.png --map-bounds "6106250,859750,5520700,284100" --map-attribution "Elevation map" --max-size-mb 300 --title "1348 England" --output outputs/medieval_map_2.html 2>&1 | tee log.txt
+# --events-file ../../Black_Death/Animations/animations/data/simulation_events_sailors.h5 --events-max-size-mb 500
