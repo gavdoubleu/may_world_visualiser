@@ -65,7 +65,11 @@ class UTMConfig(MapProjectionConfig):
             raise RuntimeError(
                 "leaflet_crs_spec unavailable until seed_from_coordinates() is called."
             )
-        crs = self._CRS.from_epsg(self._epsg)
+        # Build a clean proj4 string that proj4js can parse without PROJ 6+ extensions.
+        # pyproj's to_proj4() adds '+type=crs' which proj4js does not recognise,
+        # causing a systematic coordinate offset between pyproj and proj4js results.
+        south_flag = ' +south' if self._epsg >= 32700 else ''
+        proj4_str = f'+proj=utm +zone={self._zone}{south_flag} +datum=WGS84 +units=m +no_defs'
         # Standard Web Mercator resolutions scaled to metres.
         # Proj4Leaflet requires explicit resolutions for metric CRS; without them
         # fitBounds calculates zoom levels as if coordinates were in degrees.
@@ -73,7 +77,7 @@ class UTMConfig(MapProjectionConfig):
         return {
             'type': 'proj4',
             'code': f'EPSG:{self._epsg}',
-            'proj4': crs.to_proj4(),
+            'proj4': proj4_str,
             'resolutions': resolutions,
             'origin': [0, 0],
         }
