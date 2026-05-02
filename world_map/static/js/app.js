@@ -126,7 +126,10 @@ function buildLeafletCRS(crsDef, warnIfFallback) {
         }
         proj4.defs(crsDef.code, crsDef.proj4);
         console.info('Map projection: ' + crsDef.code);
-        return new L.Proj.CRS(crsDef.code, crsDef.proj4);
+        var crsOptions = {};
+        if (crsDef.resolutions) { crsOptions.resolutions = crsDef.resolutions; }
+        if (crsDef.origin)      { crsOptions.origin      = crsDef.origin; }
+        return new L.Proj.CRS(crsDef.code, crsDef.proj4, crsOptions);
     }
     return L.CRS.EPSG3857;
 }

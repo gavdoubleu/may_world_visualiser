@@ -66,8 +66,14 @@ class UTMConfig(MapProjectionConfig):
                 "leaflet_crs_spec unavailable until seed_from_coordinates() is called."
             )
         crs = self._CRS.from_epsg(self._epsg)
+        # Standard Web Mercator resolutions scaled to metres.
+        # Proj4Leaflet requires explicit resolutions for metric CRS; without them
+        # fitBounds calculates zoom levels as if coordinates were in degrees.
+        resolutions = [156543.03392 / (2 ** z) for z in range(22)]
         return {
             'type': 'proj4',
             'code': f'EPSG:{self._epsg}',
             'proj4': crs.to_proj4(),
+            'resolutions': resolutions,
+            'origin': [0, 0],
         }
