@@ -827,44 +827,14 @@ def main() -> None:
     n_steps = '6' if args.events_file else '5'
     print(f'\n[2/{n_steps}] Collecting world data (max {args.max_size_mb:.0f} MB) ...')
 
-    from world_map.app import create_app, _load_app_config
+    from world_map.app import create_app
 
     flask_app = create_app(world, map_config=map_config)
     flask_app.config['TESTING'] = True
 
-    # -- Projection info and bounds consistency / reprojection -----------------
-    _app_cfg    = _load_app_config(WORLD_MAP_DIR)
-    _proj_cfg   = _app_cfg.get('projection', {})
-    _bounds_epsg = int(_proj_cfg.get('bounds_epsg', 4326))
-    _projection  = flask_app.config['PROJECTION']
+    # -- Active projection info ------------------------------------------------
+    _projection = flask_app.config['PROJECTION']
     print(f'  Marker projection: {_projection.name} (EPSG:{_projection.native_epsg})')
-
-    if args.map_background == 'image':
-        print(f'  Image bounds EPSG: {_bounds_epsg}')
-        if _bounds_epsg != _projection.native_epsg:
-            print(
-                f'  WARNING: bounds_epsg ({_bounds_epsg}) does not match marker '
-                f'projection (EPSG:{_projection.native_epsg}). '
-                f'Background image may be offset from data markers. '
-                f'Set projection.bounds_epsg: {_projection.native_epsg} in '
-                f'app_config.yaml for pixel-perfect alignment.'
-            )
-        if _bounds_epsg != 4326:
-            from pyproj import Transformer as _Transformer
-            _t = _Transformer.from_crs(
-                f'EPSG:{_bounds_epsg}', 'EPSG:4326', always_xy=True
-            )
-            _south, _west = map_config['bounds'][0]
-            _north, _east = map_config['bounds'][1]
-            _west_geo, _south_geo = _t.transform(_west, _south)
-            _east_geo, _north_geo = _t.transform(_east, _north)
-            map_config['bounds'] = [[_south_geo, _west_geo], [_north_geo, _east_geo]]
-            flask_app.config['MAP_CONFIG']['bounds'] = map_config['bounds']
-            print(
-                f'  Bounds reprojected EPSG:{_bounds_epsg} → WGS84: '
-                f'N={_north_geo:.5f} E={_east_geo:.5f} '
-                f'S={_south_geo:.5f} W={_west_geo:.5f}'
-            )
 
     # Build the full lists of unit names and venue IDs needed for detail pages
     geography_units_all: list[str] = []
