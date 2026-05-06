@@ -833,7 +833,8 @@ def main() -> None:
     flask_app.config['TESTING'] = True
 
     # -- Active projection info ------------------------------------------------
-    _projection = flask_app.config['PROJECTION']
+    from world_map.context import _CTX_KEY
+    _projection = flask_app.config[_CTX_KEY].projection
     print(f'  Marker projection: {_projection.name} (EPSG:{_projection.native_epsg})')
 
     # Build the full lists of unit names and venue IDs needed for detail pages
