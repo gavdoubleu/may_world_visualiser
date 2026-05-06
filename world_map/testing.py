@@ -43,7 +43,9 @@ class WorldBuilder:
         return self
 
     def build_world(self) -> WorldData:
-        return WorldData(self._geo, self._pop, self._venues)
+        world = WorldData(self._geo, self._pop, self._venues)
+        world.compute_all_statistics()
+        return world
 
     def build_context(self, **overrides) -> AppContext:
         world = self.build_world()

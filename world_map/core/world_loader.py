@@ -14,6 +14,7 @@ from .world_data import (
     WorldData, GeographyManager, GeoUnit,
     PopulationManager, Person,
     VenueManager, Venue, Subset,
+    AGE_LABELS, AGE_BREAKS, UnitStats,
 )
 
 logger = logging.getLogger("world_loader")
@@ -307,8 +308,7 @@ def _compute_unit_statistics(f, geography) -> dict:
 
     uid_to_name = {uid: u.name for uid, u in geography.units_by_id.items()}
 
-    AGE_LABELS = ['0-15', '16-24', '25-34', '35-49', '50-64', '65+']
-    AGE_BREAKS = [0, 16, 25, 35, 50, 65, np.inf]
+    AGE_BREAKS_NP = AGE_BREAKS[:-1] + [np.inf]
 
     if len(person_geo_ids) == 0:
         return {}
@@ -331,7 +331,7 @@ def _compute_unit_statistics(f, geography) -> dict:
 
         age_dist: dict = {}
         for j, label in enumerate(AGE_LABELS):
-            lo, hi = AGE_BREAKS[j], AGE_BREAKS[j + 1]
+            lo, hi = AGE_BREAKS_NP[j], AGE_BREAKS_NP[j + 1]
             age_dist[label] = int(np.sum((sa[s:e] >= lo) & (sa[s:e] < hi)))
 
         sex_u, sex_c = np.unique(ss[s:e], return_counts=True)
@@ -465,7 +465,16 @@ def _compute_unit_statistics(f, geography) -> dict:
         if unit.parent is None:
             _aggregate(unit)
 
-    return all_stats
+    return {
+        name: UnitStats(
+            population=int(d['population']),
+            age_distribution={k: int(v) for k, v in d['age_distribution'].items()},
+            sex_distribution={str(k): int(v) for k, v in d['sex_distribution'].items()},
+            venue_types={str(k): int(v) for k, v in d.get('venue_types', {}).items()},
+            activity_counts={str(k): int(v) for k, v in d.get('activity_counts', {}).items()},
+        )
+        for name, d in all_stats.items()
+    }
 
 
 # ─── HDF5 loading functions ───────────────────────────────────────────────────

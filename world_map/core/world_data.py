@@ -3,6 +3,48 @@ Standalone data classes for world_map. No may dependencies.
 Duck-type compatible with the interface that app.py expects.
 """
 
+import math
+from dataclasses import dataclass, field
+
+AGE_LABELS: list[str] = ['0-15', '16-24', '25-34', '35-49', '50-64', '65+']
+AGE_BREAKS: list[float] = [0, 16, 25, 35, 50, 65, math.inf]
+
+
+def _age_label(age: int | float) -> str:
+    for i in range(len(AGE_LABELS) - 1):
+        if age < AGE_BREAKS[i + 1]:
+            return AGE_LABELS[i]
+    return AGE_LABELS[-1]
+
+
+@dataclass
+class UnitStats:
+    population: int
+    age_distribution: dict[str, int]
+    sex_distribution: dict[str, int]
+    venue_types: dict[str, int]
+    activity_counts: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def venues_count(self) -> int:
+        return sum(self.venue_types.values())
+
+    def people_aged(self, label: str) -> int:
+        return self.age_distribution.get(label, 0)
+
+    def venues_of_type(self, venue_type: str) -> int:
+        return self.venue_types.get(str(venue_type), 0)
+
+    def to_dict(self) -> dict:
+        return {
+            'population':       self.population,
+            'age_distribution': self.age_distribution,
+            'sex_distribution': self.sex_distribution,
+            'venues_count':     self.venues_count,
+            'venue_types':      self.venue_types,
+            'activity_counts':  self.activity_counts,
+        }
+
 
 class GeoUnit:
     def __init__(self, unit_id, name, level, coordinates=None, properties=None):
@@ -141,6 +183,38 @@ class WorldData:
         self.households = None      # not serialised; /api/households returns 404
         self._slim_statistics = None
         self._unit_statistics = None
+
+    def compute_all_statistics(self) -> None:
+        """Populate _unit_statistics for all units using pure Python. Called by WorldBuilder."""
+        if not self.geography:
+            self._unit_statistics = {}
+            return
+        stats: dict[str, UnitStats] = {}
+        for unit in self.geography.units_by_id.values():
+            people = unit.get_people()
+            age_dist = {label: 0 for label in AGE_LABELS}
+            sex_dist: dict[str, int] = {}
+            activity_counts: dict[str, int] = {}
+            for person in people:
+                age_dist[_age_label(person.age)] += 1
+                sex_dist[person.sex] = sex_dist.get(person.sex, 0) + 1
+                for act in (person.activities or []):
+                    activity_counts[act] = activity_counts.get(act, 0) + 1
+            all_venues: list = list(unit.venues or [])
+            for desc in unit.get_descendants():
+                all_venues.extend(desc.venues or [])
+            venue_types: dict[str, int] = {}
+            for venue in all_venues:
+                key = str(venue.type)
+                venue_types[key] = venue_types.get(key, 0) + 1
+            stats[unit.name] = UnitStats(
+                population=len(people),
+                age_distribution=age_dist,
+                sex_distribution=sex_dist,
+                venue_types=venue_types,
+                activity_counts=activity_counts,
+            )
+        self._unit_statistics = stats
 
     def get_statistics(self):
         stats = {}

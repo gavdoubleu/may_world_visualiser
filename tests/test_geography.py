@@ -32,7 +32,20 @@ def test_geography_level_returns_feature(client_for):
     assert coords == [1.0, 52.6]  # [lon, lat]
 
 
-def test_geography_unit_detail_full_mode(client_for):
+def test_unit_detail_uses_precomputed_stats(client_for):
+    from dataclasses import replace
+    world = WorldBuilder().add_unit('Norfolk', population=77).build_world()
+    base_ctx = WorldBuilder().build_context()
+    ctx = replace(base_ctx, world=world)
+    client = client_for(ctx)
+    resp = client.get('/api/geography/unit/Norfolk')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['population'] == 77
+    assert data['slim_mode'] is True
+
+
+def test_geography_unit_detail_stats(client_for):
     ctx = (
         WorldBuilder()
         .add_unit('Norfolk', level='county', coordinates=(52.6, 1.0), population=5)
@@ -44,6 +57,6 @@ def test_geography_unit_detail_full_mode(client_for):
     data = resp.get_json()
     assert data['name'] == 'Norfolk'
     assert data['population'] == 5
-    assert data['slim_mode'] is False
+    assert data['slim_mode'] is True
     assert '25-34' in data['age_distribution']
     assert 'M' in data['sex_distribution']

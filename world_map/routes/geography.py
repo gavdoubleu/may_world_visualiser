@@ -1,7 +1,6 @@
 """Geography API blueprint."""
 
-from flask import Blueprint, jsonify, request, current_app
-from collections import defaultdict
+from flask import Blueprint, jsonify, request
 import logging
 
 from world_map.app import _convert_numpy_types
@@ -34,12 +33,7 @@ def get_geography_levels():
 
 @geography_bp.route('/api/geography/<level>')
 def get_geography_level(level):
-    """
-    Get all geographical units at a specific level as GeoJSON.
-
-    Returns point features with coordinates and metadata.
-    For units with children, aggregates population and venue counts from all descendants.
-    """
+    """Get all geographical units at a specific level as GeoJSON."""
     try:
         world = get_app_context().world
         if not world.geography:
@@ -55,23 +49,7 @@ def get_geography_level(level):
                 continue
 
             lat, lon = unit.coordinates
-
-            # Use get_people() to recursively get all people from unit and descendants
-            all_people = unit.get_people()
-            population = len(all_people) if all_people else 0
-
-            # Aggregate venues from unit and all descendants
-            all_venues = list(unit.venues) if unit.venues else []
-            if unit.children:
-                for descendant in unit.get_descendants():
-                    if descendant.venues:
-                        all_venues.extend(descendant.venues)
-            venues_count = len(all_venues)
-
-            # Get venue breakdown from all aggregated venues
-            venue_types = defaultdict(int)
-            for venue in all_venues:
-                venue_types[str(venue.type)] += 1
+            stats = world._unit_statistics.get(unit_name)
 
             feature = {
                 'type': 'Feature',
@@ -79,9 +57,9 @@ def get_geography_level(level):
                     'id': int(unit.id) if hasattr(unit.id, 'item') else unit.id,
                     'name': str(unit.name),
                     'level': str(unit.level),
-                    'population': int(population),
-                    'venues_count': int(venues_count),
-                    'venue_types': dict(venue_types),
+                    'population': stats.population if stats else 0,
+                    'venues_count': stats.venues_count if stats else 0,
+                    'venue_types': stats.venue_types if stats else {},
                     'has_parent': unit.parent is not None,
                     'children_count': int(len(unit.children)) if unit.children else 0
                 },
@@ -92,11 +70,7 @@ def get_geography_level(level):
             }
             features.append(feature)
 
-        geojson = {
-            'type': 'FeatureCollection',
-            'features': features
-        }
-
+        geojson = {'type': 'FeatureCollection', 'features': features}
         logger.info(f"Returned {len(features)} features for level {level}")
         return jsonify(geojson)
 
@@ -107,11 +81,7 @@ def get_geography_level(level):
 
 @geography_bp.route('/api/geography/unit/<unit_name>')
 def get_unit_details(unit_name):
-    """Get detailed information about a specific geographical unit.
-
-    In slim mode, returns pre-computed statistics (no venue list, no people list).
-    In full mode, aggregates statistics from all descendants.
-    """
+    """Get detailed information about a specific geographical unit."""
     try:
         ctx = get_app_context()
         world = ctx.world
@@ -122,7 +92,10 @@ def get_unit_details(unit_name):
         if not unit:
             return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
-        # Parent and children info (needed in both modes)
+        stats = world._unit_statistics.get(unit_name)
+        if stats is None:
+            return jsonify({'error': f'No statistics for unit {unit_name}'}), 404
+
         parent_info = None
         if unit.parent:
             parent_info = {
@@ -131,104 +104,29 @@ def get_unit_details(unit_name):
                 'level': unit.parent.level
             }
 
-        # ---- Slim mode: serve pre-computed stats ----------------------------
-        unit_statistics = getattr(world, '_unit_statistics', None)
-        if unit_statistics is not None:
-            pre = unit_statistics.get(unit_name, {})
-            children_info = []
-            if unit.children:
-                for child in unit.children:
-                    child_pre = unit_statistics.get(child.name, {})
-                    children_info.append({
-                        'id': child.id,
-                        'name': child.name,
-                        'level': child.level,
-                        'population': child_pre.get('population', 0),
-                    })
-            venues_count = sum(pre.get('venue_types', {}).values())
-            return jsonify(_convert_numpy_types({
-                'id': unit.id,
-                'name': unit.name,
-                'level': unit.level,
-                'coordinates': unit.coordinates,
-                'population': pre.get('population', 0),
-                'age_distribution': pre.get('age_distribution', {}),
-                'sex_distribution': pre.get('sex_distribution', {}),
-                'venues_count': venues_count,
-                'venue_types': pre.get('venue_types', {}),
-                'activity_counts': pre.get('activity_counts', {}),
-                'parent': parent_info,
-                'children': children_info,
-                'properties': unit.properties,
-                'slim_mode': True,
-                'display_name_enabled': ctx.geo_unit_names_enabled,
-                'display_name': (ctx.geo_unit_names or {}).get(unit.name) if ctx.geo_unit_names_enabled else None,
-            }))
-
-        # ---- Full mode: compute on the fly ----------------------------------
-        all_people = unit.get_people()
-
-        age_groups = {
-            '0-15': 0, '16-24': 0, '25-34': 0,
-            '35-49': 0, '50-64': 0, '65+': 0
-        }
-        sex_distribution = defaultdict(int)
-        for person in all_people:
-            if person.age <= 15:    age_groups['0-15'] += 1
-            elif person.age <= 24:  age_groups['16-24'] += 1
-            elif person.age <= 34:  age_groups['25-34'] += 1
-            elif person.age <= 49:  age_groups['35-49'] += 1
-            elif person.age <= 64:  age_groups['50-64'] += 1
-            else:                   age_groups['65+'] += 1
-            sex_distribution[person.sex] += 1
-
-        all_venues = list(unit.venues) if unit.venues else []
-        if unit.children:
-            for descendant in unit.get_descendants():
-                if descendant.venues:
-                    all_venues.extend(descendant.venues)
-
-        venue_details = []
-        venue_types = defaultdict(int)
-        for venue in all_venues:
-            venue_types[venue.type] += 1
-            if len(venue_details) < 50:
-                venue_details.append({
-                    'id': venue.id,
-                    'name': venue.name,
-                    'type': venue.type,
-                    'coordinates': venue.coordinates,
-                    'properties': venue.properties
-                })
-
         children_info = []
-        if unit.children:
-            for child in unit.children:
-                children_info.append({
-                    'id': child.id,
-                    'name': child.name,
-                    'level': child.level,
-                    'population': len(child.get_people()),
-                })
+        for child in (unit.children or []):
+            child_stats = world._unit_statistics.get(child.name)
+            children_info.append({
+                'id': child.id,
+                'name': child.name,
+                'level': child.level,
+                'population': child_stats.population if child_stats else 0,
+            })
 
-        return jsonify({
+        return jsonify(_convert_numpy_types({
             'id': unit.id,
             'name': unit.name,
             'level': unit.level,
             'coordinates': unit.coordinates,
-            'population': len(all_people),
-            'age_distribution': age_groups,
-            'sex_distribution': dict(sex_distribution),
-            'venues_count': len(all_venues),
-            'venue_types': dict(venue_types),
-            'venue_details': venue_details,
+            **stats.to_dict(),
             'parent': parent_info,
             'children': children_info,
             'properties': unit.properties,
-            'slim_mode': False,
+            'slim_mode': True,
             'display_name_enabled': ctx.geo_unit_names_enabled,
             'display_name': (ctx.geo_unit_names or {}).get(unit.name) if ctx.geo_unit_names_enabled else None,
-        })
+        }))
 
     except Exception as e:
         logger.error(f"Error getting unit details for {unit_name}: {e}")
@@ -247,30 +145,19 @@ def get_unit_people(unit_name):
         if not unit:
             return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
-        # Pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 50, type=int)
-        per_page = min(per_page, 200)  # Cap at 200 per page
+        per_page = min(per_page, 200)
 
-        # Get all people from unit (and optionally descendants)
         include_descendants = request.args.get('include_descendants', 'false').lower() == 'true'
-
-        if include_descendants:
-            all_people = unit.get_people()
-        else:
-            all_people = list(unit.people) if unit.people else []
-
+        all_people = unit.get_people() if include_descendants else (list(unit.people) if unit.people else [])
         total_count = len(all_people)
 
-        # Apply pagination
         start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        paginated_people = all_people[start_idx:end_idx]
+        paginated_people = all_people[start_idx:start_idx + per_page]
 
-        # Build person summaries
         people_data = []
         for person in paginated_people:
-            # Get primary activity info
             primary_activity = None
             if hasattr(person, 'activity_map') and person.activity_map:
                 if 'primary_activity' in person.activity_map:
