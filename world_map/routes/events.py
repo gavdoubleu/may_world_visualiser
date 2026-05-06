@@ -1,9 +1,10 @@
 """Events API and events page blueprint."""
 
-from flask import Blueprint, jsonify, request, render_template, current_app
+from flask import Blueprint, jsonify, request, render_template
 import logging
 
 from world_map.app import _convert_numpy_types
+from world_map.context import get_app_context
 
 logger = logging.getLogger(__name__)
 
@@ -13,20 +14,16 @@ events_bp = Blueprint('events', __name__)
 @events_bp.route('/api/events/config')
 def get_event_config():
     """Get event visualization configuration."""
-    from world_map.app import load_event_config
-    event_config = current_app.config.get('EVENT_CONFIG')
-    if event_config is None:
-        event_config = load_event_config()
-        current_app.config['EVENT_CONFIG'] = event_config
-    return jsonify(event_config)
+    return jsonify(get_app_context().event_config)
 
 
 @events_bp.route('/api/events/summary')
 def get_events_summary():
     """Get summary of available events."""
-    loader = current_app.config.get('EVENT_LOADER')
-    if loader is None:
+    ctx = get_app_context()
+    if ctx.event_loader is None:
         return jsonify({'error': 'Events not loaded'}), 404
+    loader = ctx.event_loader
 
     return jsonify({
         'available_types': loader.get_available_event_types(),
@@ -49,9 +46,10 @@ def get_events_geojson_batch():
     Returns:
         JSON object mapping event_type -> GeoJSON FeatureCollection
     """
-    loader = current_app.config.get('EVENT_LOADER')
-    if loader is None:
+    ctx = get_app_context()
+    if ctx.event_loader is None:
         return jsonify({'error': 'Events not loaded'}), 404
+    loader = ctx.event_loader
 
     time_start  = request.args.get('time_start', type=float, default=0.0)
     time_end    = request.args.get('time_end',   type=float, default=loader.time_max)
@@ -78,9 +76,10 @@ def get_events_geojson_batch():
 @events_bp.route('/api/events/geojson/<event_type>')
 def get_events_geojson(event_type):
     """Get events as GeoJSON for map display."""
-    loader = current_app.config.get('EVENT_LOADER')
-    if loader is None:
+    ctx = get_app_context()
+    if ctx.event_loader is None:
         return jsonify({'error': 'Events not loaded'}), 404
+    loader = ctx.event_loader
 
     time_start = request.args.get('time_start', type=float, default=0.0)
     time_end = request.args.get('time_end', type=float, default=loader.time_max)
@@ -104,9 +103,10 @@ def get_events_geojson(event_type):
 @events_bp.route('/api/events/timeseries/<event_type>')
 def get_events_timeseries(event_type):
     """Get daily event counts as timeseries."""
-    loader = current_app.config.get('EVENT_LOADER')
-    if loader is None:
+    ctx = get_app_context()
+    if ctx.event_loader is None:
         return jsonify({'error': 'Events not loaded'}), 404
+    loader = ctx.event_loader
 
     try:
         df = loader.get_daily_events_timeseries(event_type)
@@ -122,9 +122,10 @@ def get_events_timeseries(event_type):
 @events_bp.route('/api/events/aggregated/<event_type>')
 def get_events_aggregated(event_type):
     """Get aggregated events by geo_unit."""
-    loader = current_app.config.get('EVENT_LOADER')
-    if loader is None:
+    ctx = get_app_context()
+    if ctx.event_loader is None:
         return jsonify({'error': 'Events not loaded'}), 404
+    loader = ctx.event_loader
 
     time_start = request.args.get('time_start', type=float, default=0.0)
     time_end = request.args.get('time_end', type=float, default=loader.time_max)

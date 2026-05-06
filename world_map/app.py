@@ -367,6 +367,20 @@ def create_app(world, map_config=None, panel_config_path=None):
                for k, v in default_map_config.items()}
     logger.info(f"Map configuration: {log_cfg}")
 
+    # Build typed AppContext — single source of truth for all route dependencies
+    from world_map.context import AppContext, _CTX_KEY
+    app.config[_CTX_KEY] = AppContext(
+        world=world,
+        venue_index=app.config['VENUE_INDEX'],
+        projection=app.config['PROJECTION'],
+        map_config=app.config['MAP_CONFIG'],
+        panel_config=app.config['PANEL_CONFIG'],
+        theme_config=app.config['THEME_CONFIG'],
+        event_config=app.config['EVENT_CONFIG'],
+        event_loader=app.config.get('EVENT_LOADER'),
+        geo_unit_names=app.config.get('GEO_UNIT_NAMES'),
+    )
+
     # Register blueprints
     from world_map.routes.geography import geography_bp
     from world_map.routes.population import population_bp

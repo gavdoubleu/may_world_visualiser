@@ -1,10 +1,11 @@
 """Venues, households, and world-statistics API blueprint."""
 
-from flask import Blueprint, jsonify, current_app
+from flask import Blueprint, jsonify
 from collections import defaultdict
 import logging
 
 from world_map.app import _convert_numpy_types
+from world_map.context import get_app_context
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ venues_bp = Blueprint('venues', __name__)
 def get_venue_types():
     """Get all available venue types and their counts."""
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         if not world.venues:
             return jsonify({'types': []})
 
@@ -35,7 +36,7 @@ def get_venue_types():
 def get_venues_by_type(venue_type):
     """Get all venues of a specific type as GeoJSON."""
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         if not world.venues:
             return jsonify({'type': 'FeatureCollection', 'features': []})
 
@@ -89,12 +90,12 @@ def get_venues_by_type(venue_type):
 def get_venue_details(venue_id):
     """Get detailed information about a specific venue."""
     try:
-        world = current_app.config['WORLD']
+        ctx = get_app_context()
+        world = ctx.world
         if not world.venues:
             return jsonify({'error': 'No venues data'}), 404
 
-        venue_index = current_app.config['VENUE_INDEX']
-        venue = venue_index.get(venue_id)
+        venue = ctx.venue_index.get(venue_id)
         if not venue:
             return jsonify({'error': f'Venue {venue_id} not found'}), 404
 
@@ -140,7 +141,7 @@ def get_venue_details(venue_id):
 def get_household_statistics():
     """Get household statistics."""
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         if not world.households:
             return jsonify({'error': 'No household data'}), 404
 
@@ -166,7 +167,7 @@ def get_household_statistics():
 def get_world_statistics():
     """Get comprehensive statistics about the world."""
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         stats = world.get_statistics()
         # Merge in slim-mode aggregate statistics if available
         slim_stats = getattr(world, '_slim_statistics', None)

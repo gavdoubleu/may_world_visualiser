@@ -5,6 +5,7 @@ from collections import defaultdict
 import logging
 
 from world_map.app import _convert_numpy_types
+from world_map.context import get_app_context
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ geography_bp = Blueprint('geography', __name__)
 def get_geography_levels():
     """Get available geography levels."""
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         if not world.geography:
             return jsonify({'levels': []})
 
@@ -40,7 +41,7 @@ def get_geography_level(level):
     For units with children, aggregates population and venue counts from all descendants.
     """
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         if not world.geography:
             return jsonify({'type': 'FeatureCollection', 'features': []})
 
@@ -112,7 +113,8 @@ def get_unit_details(unit_name):
     In full mode, aggregates statistics from all descendants.
     """
     try:
-        world = current_app.config['WORLD']
+        ctx = get_app_context()
+        world = ctx.world
         if not world.geography:
             return jsonify({'error': 'No geography data'}), 404
 
@@ -144,8 +146,6 @@ def get_unit_details(unit_name):
                         'population': child_pre.get('population', 0),
                     })
             venues_count = sum(pre.get('venue_types', {}).values())
-            geo_unit_names = current_app.config.get('GEO_UNIT_NAMES')
-            names_enabled = current_app.config.get('GEO_UNIT_NAMES_ENABLED', False)
             return jsonify(_convert_numpy_types({
                 'id': unit.id,
                 'name': unit.name,
@@ -161,8 +161,8 @@ def get_unit_details(unit_name):
                 'children': children_info,
                 'properties': unit.properties,
                 'slim_mode': True,
-                'display_name_enabled': names_enabled,
-                'display_name': (geo_unit_names or {}).get(unit.name) if names_enabled else None,
+                'display_name_enabled': ctx.geo_unit_names_enabled,
+                'display_name': (ctx.geo_unit_names or {}).get(unit.name) if ctx.geo_unit_names_enabled else None,
             }))
 
         # ---- Full mode: compute on the fly ----------------------------------
@@ -211,8 +211,6 @@ def get_unit_details(unit_name):
                     'population': len(child.get_people()),
                 })
 
-        geo_unit_names = current_app.config.get('GEO_UNIT_NAMES')
-        names_enabled = current_app.config.get('GEO_UNIT_NAMES_ENABLED', False)
         return jsonify({
             'id': unit.id,
             'name': unit.name,
@@ -228,8 +226,8 @@ def get_unit_details(unit_name):
             'children': children_info,
             'properties': unit.properties,
             'slim_mode': False,
-            'display_name_enabled': names_enabled,
-            'display_name': (geo_unit_names or {}).get(unit.name) if names_enabled else None,
+            'display_name_enabled': ctx.geo_unit_names_enabled,
+            'display_name': (ctx.geo_unit_names or {}).get(unit.name) if ctx.geo_unit_names_enabled else None,
         })
 
     except Exception as e:
@@ -241,7 +239,7 @@ def get_unit_details(unit_name):
 def get_unit_people(unit_name):
     """Get list of people in a geographical unit with pagination."""
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         if not world.geography:
             return jsonify({'error': 'No geography data'}), 404
 

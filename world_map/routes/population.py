@@ -1,10 +1,11 @@
 """Population API blueprint."""
 
-from flask import Blueprint, jsonify, current_app
+from flask import Blueprint, jsonify, request
 from collections import defaultdict
 import logging
 
 from world_map.app import _convert_numpy_types
+from world_map.context import get_app_context
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ population_bp = Blueprint('population', __name__)
 def get_population_statistics():
     """Get overall population statistics."""
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         if not world.population:
             return jsonify({'error': 'No population data'}), 404
 
@@ -43,7 +44,7 @@ def get_population_statistics():
 def get_person_details(person_id):
     """Get detailed information about a specific person including activity_map."""
     try:
-        world = current_app.config['WORLD']
+        world = get_app_context().world
         if not world.population:
             return jsonify({'error': 'No population data'}), 404
 
