@@ -96,6 +96,14 @@ class EventAggregator:
     def time_range(self) -> tuple[float, float]:
         return self._bundle.time_min, self._bundle.time_max
 
+    @property
+    def geo_unit_coords(self) -> dict[int, tuple[float, float]]:
+        return self._geo_unit_coords
+
+    @property
+    def geo_unit_population(self) -> dict[int, int]:
+        return self._geo_unit_population
+
     def available_event_types(self) -> list[str]:
         return [k for k, v in self._bundle.events_sorted.items() if len(v) > 0]
 

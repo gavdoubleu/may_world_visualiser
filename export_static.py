@@ -354,7 +354,7 @@ def _collect_events_data(events_path: str, world, event_config: dict,
 
     events_summary = {
         'available_types': available_types,
-        'counts': {k: int(v) for k, v in loader.get_event_summary().items()},
+        'counts': {k: int(v) for k, v in loader.event_summary().items()},
         'time_range': [time_min, time_max],  # array — JS uses [0] and [1]
     }
 

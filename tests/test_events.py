@@ -149,6 +149,18 @@ def test_aggregator_empty_event_type():
     assert result == {}
 
 
+def test_aggregator_exposes_geo_unit_coords():
+    coords = {0: (51.5, -0.1), 1: (52.0, 0.5)}
+    agg = _make_aggregator(coords=coords)
+    assert agg.geo_unit_coords == coords
+
+
+def test_aggregator_exposes_geo_unit_population():
+    population = {0: 10_000, 1: 5_000}
+    agg = _make_aggregator(population=population)
+    assert agg.geo_unit_population == population
+
+
 def test_aggregator_rate_method():
     agg = _make_aggregator(population={0: 100_000})
     result = agg.aggregated('infections', 0.0, 10.0, method='rate')
