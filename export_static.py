@@ -287,8 +287,8 @@ def _collect_events_data(events_path: str, world, event_config: dict,
     print(f"  Loading events from {events_path} ...", flush=True)
     loader = load_events_with_world(events_path, world)
 
-    time_min, time_max = loader.get_time_range()
-    available_types = loader.get_available_event_types()
+    time_min, time_max = loader.time_range
+    available_types = loader.available_event_types()
 
     if not available_types:
         print("  No events found in file.")
@@ -319,17 +319,14 @@ def _collect_events_data(events_path: str, world, event_config: dict,
         for step_time in steps:
             t_start = step_time - rolling_window
             t_end = step_time
-            aggregated = loader.aggregate_events_by_geo_unit(etype, t_start, t_end, 'count')
+            aggregated = loader.aggregated(etype, t_start, t_end, 'count')
             # Sparse dict: only geo_units with >0 events
-            step_dict = {
-                str(gid): int(info['count'])
-                for gid, info in aggregated.items()
-                if info.get('count', 0) > 0
-            }
+            step_dict = {gid: int(info['count'])
+                         for gid, info in aggregated.items()
+                         if info.get('count', 0) > 0}
             rolling_steps.append(step_dict)
 
-        df = loader.get_daily_events_timeseries(etype)
-        daily = df.to_dict(orient='records')
+        daily = loader.timeseries(etype)
 
         events_types_data[etype] = {
             'rolling': rolling_steps,

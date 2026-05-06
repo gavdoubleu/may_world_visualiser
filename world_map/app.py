@@ -17,14 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 def initialize_events(events_path, flask_app, world=None):
-    """Initialize event loader with optional world instance for geo coordinates."""
+    """Initialize event aggregator with optional world instance for geo coordinates."""
     try:
         from world_map.events.event_loader import load_events_with_world
-        event_loader = load_events_with_world(events_path, world)
-        flask_app.config['EVENT_LOADER'] = event_loader
-        logger.info(f"Event loader initialized from {events_path}")
+        from world_map.context import _CTX_KEY
+        event_aggregator = load_events_with_world(events_path, world)
+        flask_app.config['EVENT_LOADER'] = event_aggregator
+        ctx = flask_app.config.get(_CTX_KEY)
+        if ctx is not None:
+            ctx.event_loader = event_aggregator
+        logger.info(f"Event aggregator initialized from {events_path}")
     except Exception as e:
-        logger.error(f"Failed to initialize event loader: {e}")
+        logger.error(f"Failed to initialize event aggregator: {e}")
         flask_app.config['EVENT_LOADER'] = None
 
 

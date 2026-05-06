@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from world_map.events.event_loader import EventLoader
+    from world_map.events.event_aggregator import EventAggregator
 
 from world_map.core.world_data import WorldData, Venue
 from world_map.projection.base import MapProjectionConfig
@@ -21,7 +21,7 @@ class AppContext:
     projection: MapProjectionConfig
     map_config: dict
     app_config: AppConfig
-    event_loader: Optional[EventLoader] = None
+    event_loader: Optional['EventAggregator'] = None
 
     @property
     def geo_unit_names(self) -> dict[str, str] | None:
