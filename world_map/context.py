@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 from world_map.core.world_data import WorldData, Venue
 from world_map.projection.base import MapProjectionConfig
+from world_map.config import AppConfig
 
 _CTX_KEY = 'APP_CONTEXT'
 
@@ -19,15 +20,16 @@ class AppContext:
     venue_index: dict[int, Venue]
     projection: MapProjectionConfig
     map_config: dict
-    panel_config: dict
-    theme_config: dict
-    event_config: dict
+    app_config: AppConfig
     event_loader: Optional[EventLoader] = None
-    geo_unit_names: Optional[dict[str, str]] = None
+
+    @property
+    def geo_unit_names(self) -> dict[str, str] | None:
+        return self.app_config.geo_unit_names
 
     @property
     def geo_unit_names_enabled(self) -> bool:
-        return self.geo_unit_names is not None
+        return self.app_config.geo_unit_names is not None
 
 
 def get_app_context() -> AppContext:

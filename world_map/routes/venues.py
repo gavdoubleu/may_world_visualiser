@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify
 from collections import defaultdict
 import logging
 
-from world_map.app import _convert_numpy_types
+from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def get_venues_by_type(venue_type):
                     'type': str(venue.type),
                     'geographical_unit': str(venue.geographical_unit.name) if venue.geographical_unit else None,
                     'num_members': int(total_members),
-                    'properties': _convert_numpy_types(venue.properties) if venue.properties else {}
+                    'properties': convert_numpy_types(venue.properties) if venue.properties else {}
                 },
                 'geometry': {
                     'type': 'Point',
@@ -173,7 +173,7 @@ def get_world_statistics():
         slim_stats = getattr(world, '_slim_statistics', None)
         if slim_stats:
             stats['slim_statistics'] = slim_stats
-        stats = _convert_numpy_types(stats)
+        stats = convert_numpy_types(stats)
         return jsonify(stats)
 
     except Exception as e:

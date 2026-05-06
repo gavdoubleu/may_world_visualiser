@@ -11,6 +11,7 @@ from world_map.core.world_data import (
     WorldData,
 )
 from world_map.context import AppContext
+from world_map.config import AppConfig
 from world_map.projection.web_mercator import WebMercatorConfig
 
 
@@ -54,9 +55,7 @@ class WorldBuilder:
             venue_index={},
             projection=WebMercatorConfig(),
             map_config={'background_type': 'osm'},
-            panel_config={},
-            theme_config={},
-            event_config={},
+            app_config=AppConfig.minimal(),
         )
         defaults.update(overrides)
         return AppContext(**defaults)

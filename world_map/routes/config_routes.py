@@ -15,7 +15,7 @@ config_bp = Blueprint('config', __name__)
 def index():
     """Serve the main interactive map page."""
     ctx = get_app_context()
-    logo_path = (ctx.theme_config or {}).get('logo_path', '')
+    logo_path = (ctx.app_config.theme or {}).get('logo_path', '')
     logo_url = f'/static/{logo_path}' if logo_path else ''
     return render_template('index.html', logo_url=logo_url)
 
@@ -36,20 +36,20 @@ def get_map_config():
 @config_bp.route('/api/panel/config')
 def get_panel_config():
     """Get info panel configuration for customizing displayed attributes."""
-    return jsonify(get_app_context().panel_config)
+    return jsonify(get_app_context().app_config.panel)
 
 
 @config_bp.route('/api/theme')
 def get_theme():
     """Return theme configuration as JSON."""
-    return jsonify(get_app_context().theme_config)
+    return jsonify(get_app_context().app_config.theme)
 
 
 @config_bp.route('/api/theme.css')
 def get_theme_css():
     """Return a CSS stylesheet generated from the active theme config."""
     from flask import current_app
-    theme = get_app_context().theme_config or {}
+    theme = get_app_context().app_config.theme or {}
     fonts = theme.get('fonts', {})
 
     display_font = fonts.get('display', 'sans-serif')

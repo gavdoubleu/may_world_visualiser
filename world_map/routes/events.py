@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify, request, render_template
 import logging
 
-from world_map.app import _convert_numpy_types
+from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ events_bp = Blueprint('events', __name__)
 @events_bp.route('/api/events/config')
 def get_event_config():
     """Get event visualization configuration."""
-    return jsonify(get_app_context().event_config)
+    return jsonify(get_app_context().app_config.events)
 
 
 @events_bp.route('/api/events/summary')
@@ -141,7 +141,7 @@ def get_events_aggregated(event_type):
 
         result = {}
         for geo_unit_id, data in aggregated.items():
-            result[str(geo_unit_id)] = _convert_numpy_types(data)
+            result[str(geo_unit_id)] = convert_numpy_types(data)
 
         return jsonify({
             'event_type': event_type,

@@ -220,8 +220,7 @@ Examples:
         if events_path.exists():
             print(f"\nLoading events from: {events_path}")
             try:
-                from world_map.app import initialize_events, load_event_config
-                load_event_config()
+                from world_map.app import initialize_events
                 initialize_events(str(events_path), app, world)
                 print("Events loaded successfully!")
             except Exception as e:

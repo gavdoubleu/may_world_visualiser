@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 from collections import defaultdict
 import logging
 
-from world_map.app import _convert_numpy_types
+from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ def get_person_details(person_id):
                                     subset_list.append(subset_info)
                         activity_map_data[activity_type][venue_type] = subset_list
 
-        return jsonify(_convert_numpy_types({
+        return jsonify(convert_numpy_types({
             'id': person.id,
             'age': person.age,
             'sex': person.sex,
