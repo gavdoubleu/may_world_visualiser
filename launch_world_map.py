@@ -110,6 +110,13 @@ Examples:
         help='Path to simulation_events.h5 file for event visualization'
     )
 
+    parser.add_argument(
+        '--config',
+        type=str,
+        default=None,
+        help='Path to config.yaml (default: world_map/yaml/config.yaml)'
+    )
+
     args = parser.parse_args()
 
     if not args.world_file:
@@ -212,7 +219,9 @@ Examples:
         print("\nMap Configuration: OpenStreetMap (default)")
 
     # Initialize and run the Flask app
-    app = create_app(world, map_config=map_config)
+    from pathlib import Path as _Path
+    config_path = _Path(args.config) if args.config else None
+    app = create_app(world, map_config=map_config, config_path=config_path)
 
     # Initialize events if provided
     if args.events_file:

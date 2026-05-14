@@ -1,4 +1,4 @@
-"""Application configuration loaded from YAML. Single source of truth."""
+"""Application configuration loaded from a single config.yaml."""
 
 from __future__ import annotations
 import csv
@@ -10,7 +10,8 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-_WORLD_MAP_DIR = Path(__file__).parent
+_BUILTIN_THEMES_DIR = Path(__file__).parent / 'yaml' / 'themes'
+_DEFAULT_CONFIG_PATH = Path(__file__).parent / 'yaml' / 'config.yaml'
 
 
 @dataclass
@@ -23,41 +24,24 @@ class AppConfig:
     projection_kwargs: dict
 
     @classmethod
-    def load(cls, world_map_dir: Path | None = None) -> 'AppConfig':
-        """Load all config from yaml/. Raises FileNotFoundError for any missing file."""
-        if world_map_dir is None:
-            world_map_dir = _WORLD_MAP_DIR
-        yaml_dir = world_map_dir / 'yaml'
+    def load(cls, config_path: Path) -> 'AppConfig':
+        """Load all config from a single config.yaml. Raises on missing required sections."""
+        with open(config_path) as f:
+            cfg: dict = yaml.safe_load(f) or {}
 
-        # app_config.yaml is the only optional file — missing means empty config
-        try:
-            with open(yaml_dir / 'app_config.yaml') as f:
-                app_cfg: dict = yaml.safe_load(f) or {}
-        except FileNotFoundError:
-            logger.warning("app_config.yaml not found, using defaults")
-            app_cfg = {}
+        panel = cfg.get('panel')
+        if panel is None:
+            raise KeyError(f"'panel' section missing from {config_path}")
 
-        # Panel config — required
-        with open(yaml_dir / 'info_panel_config.yaml') as f:
-            panel = yaml.safe_load(f) or {}
-        logger.info("Loaded panel config")
+        events = cfg.get('events')
+        if events is None:
+            raise KeyError(f"'events' section missing from {config_path}")
 
-        # Theme — required; name comes from app_config
-        theme_name = app_cfg.get('theme', 'dark_scientific')
-        with open(yaml_dir / 'themes' / f'{theme_name}.yaml') as f:
-            theme = yaml.safe_load(f) or {}
-        logger.info(f"Loaded theme '{theme_name}'")
+        theme = _load_theme(cfg.get('theme', 'dark_scientific'), config_path)
 
-        # Event visualisation config — required
-        with open(yaml_dir / 'event_visualisation.yaml') as f:
-            events = yaml.safe_load(f) or {}
-        logger.info("Loaded event visualisation config")
+        geo_unit_names = _load_geo_unit_names(cfg.get('geo_unit_names', {}), config_path.parent)
 
-        # Geo unit names — optional feature; CSV required when enabled
-        geo_unit_names = _load_geo_unit_names(app_cfg, world_map_dir)
-
-        # Projection
-        proj_cfg = app_cfg.get('projection', {})
+        proj_cfg = cfg.get('projection', {})
         projection_type = proj_cfg.get('type', 'web_mercator')
         projection_kwargs = {k: v for k, v in proj_cfg.items() if k not in ('type', 'bounds_epsg')}
 
@@ -83,19 +67,33 @@ class AppConfig:
         )
 
 
-def _load_geo_unit_names(app_cfg: dict, world_map_dir: Path) -> dict[str, str] | None:
-    cfg = app_cfg.get('geo_unit_names', {})
-    if not cfg.get('enabled', False):
+def _load_theme(theme_ref: str, config_path: Path) -> dict:
+    """Resolve theme_ref to a YAML file and load it.
+
+    theme_ref is either a built-in name ('dark_scientific') or a path
+    relative to config_path's directory ('./my_theme.yaml').
+    """
+    if theme_ref.endswith('.yaml') or '/' in theme_ref or '\\' in theme_ref:
+        theme_path = config_path.parent / theme_ref
+    else:
+        theme_path = _BUILTIN_THEMES_DIR / f'{theme_ref}.yaml'
+    with open(theme_path) as f:
+        theme = yaml.safe_load(f) or {}
+    logger.info(f"Loaded theme '{theme_ref}'")
+    return theme
+
+
+def _load_geo_unit_names(geo_cfg: dict, config_dir: Path) -> dict[str, str] | None:
+    if not geo_cfg.get('enabled', False):
         return None
 
-    csv_path = Path(cfg.get('csv_path', ''))
+    csv_path = Path(geo_cfg.get('csv_path', ''))
     if not csv_path.is_absolute():
-        csv_path = world_map_dir.parent / csv_path
+        csv_path = config_dir / csv_path
 
-    id_col = cfg.get('id_column', 'MBD_Temp_ID')
-    name_col = cfg.get('name_column', 'Name')
+    id_col = geo_cfg.get('id_column', 'MBD_Temp_ID')
+    name_col = geo_cfg.get('name_column', 'Name')
 
-    # Raises FileNotFoundError if CSV missing when feature is enabled
     mapping: dict[str, str] = {}
     with open(csv_path, newline='', encoding='utf-8') as f:
         for row in csv.DictReader(f):

@@ -47,10 +47,11 @@ def get_event_loader():
     return current_app.config.get('EVENT_LOADER')
 
 
-def create_app(world, map_config=None):
+def create_app(world, map_config=None, config_path=None):
     """Initialize the Flask app with a World instance and optional map configuration.
 
     map_config keys: background_type, image_url, bounds, attribution.
+    config_path: path to config.yaml; defaults to world_map/yaml/config.yaml.
     """
     app = Flask(__name__)
     CORS(app)
@@ -74,9 +75,10 @@ def create_app(world, map_config=None):
             venue_index[venue.id] = venue
     app.config['VENUE_INDEX'] = venue_index
 
-    # Load all YAML config in one place — fail fast on missing files
-    from world_map.config import AppConfig
-    cfg = AppConfig.load(Path(__file__).parent)
+    from world_map.config import AppConfig, _DEFAULT_CONFIG_PATH
+    if config_path is None:
+        config_path = _DEFAULT_CONFIG_PATH
+    cfg = AppConfig.load(Path(config_path))
 
     # Build map projection from config
     from world_map.projection import build as _build_projection, MapProjectionConfig
@@ -138,12 +140,6 @@ def create_app(world, map_config=None):
         return jsonify({'error': 'Internal server error'}), 500
 
     return app
-
-
-# Keep initialize_app as an alias for backwards compatibility
-def initialize_app(world, map_config=None, panel_config_path=None):
-    """Alias for create_app() — kept for backwards compatibility."""
-    return create_app(world, map_config=map_config, panel_config_path=panel_config_path)
 
 
 if __name__ == '__main__':

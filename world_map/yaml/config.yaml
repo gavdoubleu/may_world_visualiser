@@ -1,0 +1,392 @@
+# World Map Configuration
+# ========================
+# Single config file for all world map settings.
+# Copy this file, edit it, then pass it via:
+#   python launch_world_map.py --world-file world.h5 --config /path/to/config.yaml
+#   python export_static.py --world-file world.h5 --output map.html --config /path/to/config.yaml
+#
+# If --config is omitted, this file is used as the default.
+
+# =============================================================================
+# THEME
+# =============================================================================
+# Built-in name (looks in world_map/yaml/themes/): dark_scientific, clean_minimal
+# Or a path relative to this config file: ./my_theme.yaml
+theme: dark_scientific
+
+# =============================================================================
+# PROJECTION
+# =============================================================================
+# Omit this block to use the default (web_mercator / OpenStreetMap).
+# type options: 'web_mercator' (default), 'utm'
+#
+# UTM requires a custom image background (OSM tiles are Web Mercator only).
+# When using UTM with a background image, supply --map-bounds in WGS84 degrees
+# corresponding to the image NW and SE pixel corners. Use pyproj to convert:
+#   from pyproj import Transformer
+#   t = Transformer.from_crs("EPSG:<zone_epsg>", "EPSG:4326", always_xy=True)
+#   lon_nw, lat_nw = t.transform(utm_x_min, utm_y_max)
+#   lon_se, lat_se = t.transform(utm_x_max, utm_y_min)
+#   # --map-bounds "lat_nw,lon_se,lat_se,lon_nw"  (north,east,south,west)
+
+projection:
+  type: web_mercator
+  # type: utm
+  # zone: 30
+
+# =============================================================================
+# GEO UNIT NAMES  (optional)
+# =============================================================================
+# Maps internal simulation IDs to human-readable place names.
+# Set enabled: false (or omit this block) to show raw IDs.
+
+geo_unit_names:
+  enabled: false
+  csv_path: data/Geo_unit_names.csv   # relative to this config file's directory
+  id_column: MBD_Temp_ID
+  name_column: Name
+
+# =============================================================================
+# INFO PANEL
+# =============================================================================
+# Controls what appears in the side panel when clicking a geo unit or venue.
+#
+# Field types:
+#   attribute    – direct value from data (e.g. population, name)
+#   computed     – derived from multiple attributes
+#   distribution – bar chart (e.g. age_distribution)
+#   breakdown    – counts by category (e.g. venue_types)
+#   list         – item list (e.g. venue_details)
+#   properties   – key-value pairs from .properties dict
+#   grid         – key-value grid (displayed in columns)
+#   people       – link to people list for this unit
+#
+# Set enabled: false on any section to hide it without deleting it.
+
+panel:
+
+  geo_unit_panel:
+    title_field: "name"
+
+    popup:
+      enabled: true
+      fields:
+        - name: "name"
+          label: "Name"
+          type: "attribute"
+        - name: "level"
+          label: "Level"
+          type: "attribute"
+        - name: "population"
+          label: "Population"
+          type: "attribute"
+          format: "number"
+        - name: "venues_count"
+          label: "Venues"
+          type: "attribute"
+
+    detail_sections:
+
+      - name: "basic_info"
+        title: null
+        type: "grid"
+        enabled: true
+        fields:
+          - name: "level"
+            label: "Level"
+            type: "attribute"
+          - name: "population"
+            label: "Population"
+            type: "attribute"
+            format: "number"
+          - name: "venues_count"
+            label: "Venues"
+            type: "attribute"
+          - name: "children_count"
+            label: "Children Units"
+            type: "computed"
+            source: "children.length"
+
+      - name: "age_distribution"
+        title: "Age Distribution"
+        type: "distribution"
+        enabled: true
+        source: "age_distribution"
+        show_percentage: true
+
+      - name: "sex_distribution"
+        title: "Sex Distribution"
+        type: "distribution"
+        enabled: true
+        source: "sex_distribution"
+        show_percentage: true
+
+      - name: "activity_breakdown"
+        title: "Activity Breakdown"
+        type: "distribution"
+        enabled: true
+        source: "activity_counts"
+        denominator_field: "population"
+        sort_by: "count"
+        show_percentage: true
+
+      - name: "venue_breakdown"
+        title: "Venue Types"
+        type: "breakdown"
+        enabled: true
+        source: "venue_types"
+        sort_by: "count"
+        sort_order: "desc"
+        max_items: 20
+
+      - name: "venue_list"
+        title: "Venues"
+        type: "list"
+        enabled: false
+        source: "venue_details"
+        max_items: 50
+        fields:
+          - name: "type"
+            label: "Type"
+          - name: "name"
+            label: "Name"
+
+      - name: "custom_properties"
+        title: "Additional Properties"
+        type: "properties"
+        enabled: false
+        exclude:
+          - "internal_id"
+
+      - name: "people"
+        title: "People"
+        type: "people"
+        enabled: false
+        show_count: true
+        show_button: true
+        button_text: "View People List"
+
+  marker_styles:
+
+    geo_unit:
+      size:
+        method: "sqrt"
+        characteristic_population: 100
+        min_radius: 3
+        max_radius: 15
+        scale: 5
+      color:
+        method: "threshold"
+        thresholds:
+          - value: 100
+            color: "#FFFFFF"
+          - value: 500
+            color: "#FFFFF0"
+          - value: 1000
+            color: "#FFFFE0"
+          - value: 5000
+            color: "#FAFAD2"
+          - value: 10000
+            color: "#FFF5EE"
+          - value: null
+            color: "#FFE4E1"
+      border:
+        color: "#808080"
+        width: 1
+        opacity: 1
+      fill_opacity: 0.7
+      zoom_scaling:
+        enabled: true
+        base_zoom: 1
+        scale_exponent: 0.7
+        min_scale: 0.3
+        max_scale: 1.0
+
+    venue:
+      size:
+        radius: 3
+      fill_opacity: 0.8
+      colors:
+        school: "#e74c3c"
+        hospital: "#3498db"
+        university: "#9b59b6"
+        company: "#f39c12"
+        household: "#2ecc71"
+        land: "#8B4513"
+        church: "#9932CC"
+        market: "#FF6347"
+        default: "#95a5a6"
+      border:
+        color: "#ffffff"
+        width: 1
+        opacity: 1
+      zoom_scaling:
+        enabled: true
+        base_zoom: 6
+        scale_exponent: 0.5
+        min_scale: 0.3
+        max_scale: 3.0
+
+  display:
+    number_format:
+      use_thousands_separator: true
+      decimal_places: 1
+    charts:
+      bar_height: 20
+      max_bar_width: 100
+      show_values: true
+      show_percentages: true
+    panel:
+      width: 400
+      animation: "slide"
+      close_on_map_click: false
+
+# =============================================================================
+# EVENT VISUALISATION
+# =============================================================================
+# Controls display of simulation events (infections, deaths, etc.) when an
+# events file is loaded via --events-file.
+#
+# Color selection: two modes per event type
+#   color_thresholds – absolute count thresholds (good for cross-time comparison)
+#   gradient         – relative to current max (set use_relative_scaling: true)
+#
+# Each key under event_types must match an event type name in the HDF5 events file.
+# To add a new type: add a new key with the same structure as infections/deaths.
+# To disable a type: comment it out.
+
+events:
+
+  time:
+    aggregation_window: 1.0       # time units per frame (typically days)
+    playback_interval_ms: 500     # ms between frames during playback
+    rolling_window_days: 1        # days shown at once
+
+  event_types:
+
+    infections:
+      label: "Infections"
+      description: "New infection events"
+      default_visible: true
+      icon: "virus"
+      marker:
+        color: "#FFE4E1"
+        border:
+          color: "#ffffff"
+          width: 2
+          opacity: 0.8
+        fill_opacity: 0.8
+        size_scale: 0.5
+      color_thresholds:
+        - max_count: 2
+          color: "#FFA500"
+          label: "Very Low"
+        - max_count: 5
+          color: "#FF8C00"
+          label: "Low"
+        - max_count: 10
+          color: "#FF6347"
+          label: "Medium"
+        - max_count: 20
+          color: "#FF4500"
+          label: "High"
+        - max_count: null
+          color: "#B22222"
+          label: "Very High"
+      use_relative_scaling: false
+      gradient:
+        low: "#fee5d9"
+        medium: "#fcae91"
+        high: "#fb6a4a"
+        very_high: "#cb181d"
+
+    deaths:
+      label: "Deaths"
+      description: "Death events"
+      default_visible: true
+      icon: "skull"
+      marker:
+        color: "#2c3e50"
+        border:
+          color: "#ffffff"
+          width: 2
+          opacity: 0.9
+        fill_opacity: 0.9
+        size_scale: 0.8
+      color_thresholds:
+        - max_count: 1
+          color: "#d9d9d9"
+          label: "Very Low"
+        - max_count: 5
+          color: "#969696"
+          label: "Low"
+        - max_count: 15
+          color: "#525252"
+          label: "Medium"
+        - max_count: 30
+          color: "#252525"
+          label: "High"
+        - max_count: null
+          color: "#000000"
+          label: "Very High"
+      use_relative_scaling: false
+      gradient:
+        low: "#d9d9d9"
+        medium: "#969696"
+        high: "#525252"
+        very_high: "#252525"
+
+  display:
+    default_mode: "choropleth"
+    choropleth:
+      size:
+        method: "sqrt"
+        min_radius: 2
+        max_radius: 7
+        scale: 0.5
+      border:
+        color: "#333333"
+        width: 1
+        opacity: 0.8
+      fill_opacity: 0.7
+      show_labels: true
+      label_font_size: 10
+    markers:
+      size:
+        method: "sqrt"
+        min_radius: 5
+        max_radius: 40
+        scale: 1.5
+      border:
+        color: "#ffffff"
+        width: 2
+        opacity: 1
+      fill_opacity: 0.6
+    zoom_scaling:
+      enabled: true
+      base_zoom: 1
+      scale_exponent: 0.5
+      min_scale: 0.3
+      max_scale: 1.5
+
+  aggregation:
+    method: "count"
+    rate_per: 100000
+    cumulative: false
+
+  legend:
+    position: "bottomright"
+    show_threshold_labels: true
+    show_totals: true
+    title: "Event Counts"
+
+  animation:
+    transition_duration: 300
+    fade_duration: 200
+    easing: "ease-out"
+
+  popup:
+    show_count: true
+    show_rate: true
+    show_geo_unit_name: true
+    date_format: "Day {time}"

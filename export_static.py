@@ -46,7 +46,6 @@ import argparse
 import urllib.request
 from pathlib import Path
 
-import yaml
 
 # ---------------------------------------------------------------------------
 # Path setup
@@ -69,28 +68,6 @@ DEFAULT_MAX_SIZE_MB = 80
 # ---------------------------------------------------------------------------
 # Theme helpers
 # ---------------------------------------------------------------------------
-
-def _load_theme(script_dir: Path) -> dict:
-    """Load the active theme from app_config.yaml → yaml/themes/{name}.yaml."""
-    app_config_path = script_dir / 'yaml' / 'app_config.yaml'
-    theme_name = 'dark_scientific'
-    try:
-        with open(app_config_path, 'r') as f:
-            app_cfg = yaml.safe_load(f)
-        theme_name = app_cfg.get('theme', 'dark_scientific')
-    except FileNotFoundError:
-        print(f'  [theme] app_config.yaml not found, defaulting to dark_scientific')
-
-    theme_path = script_dir / 'yaml' / 'themes' / f'{theme_name}.yaml'
-    try:
-        with open(theme_path, 'r') as f:
-            theme = yaml.safe_load(f)
-        print(f'  [theme] Loaded theme "{theme_name}"')
-        return theme
-    except FileNotFoundError:
-        print(f'  [theme] Theme file not found: {theme_path}, using empty theme')
-        return {}
-
 
 def _build_theme_css(theme: dict, static_dir: Path) -> str:
     """Generate inline CSS from a theme dict, embedding fonts as base64 data URIs."""
@@ -755,6 +732,11 @@ def main() -> None:
             'Event types are dropped once the limit is reached.'
         ),
     )
+    parser.add_argument(
+        '--config',
+        default=None,
+        help='Path to config.yaml (default: world_map/yaml/config.yaml)',
+    )
 
     args = parser.parse_args()
 
@@ -826,7 +808,8 @@ def main() -> None:
 
     from world_map.app import create_app
 
-    flask_app = create_app(world, map_config=map_config)
+    config_path = Path(args.config) if args.config else None
+    flask_app = create_app(world, map_config=map_config, config_path=config_path)
     flask_app.config['TESTING'] = True
 
     # -- Active projection info ------------------------------------------------
@@ -873,7 +856,9 @@ def main() -> None:
     js_app     = (static_dir / 'js' / 'app.js').read_text(encoding='utf-8')
     js_events  = (static_dir / 'js' / 'events.js').read_text(encoding='utf-8')
     print('  style.css, events.css, app.js, events.js — OK')
-    theme     = _load_theme(WORLD_MAP_DIR)
+    from world_map.context import get_app_context
+    with flask_app.app_context():
+        theme = get_app_context().app_config.theme
     theme_css = _build_theme_css(theme, static_dir)
 
     # ---- [4] Leaflet + proj4 -------------------------------------------------

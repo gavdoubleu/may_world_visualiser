@@ -10,7 +10,7 @@ def test_app_config_importable():
 
 
 def test_load_returns_app_config():
-    cfg = AppConfig.load(Path('world_map'))
+    cfg = AppConfig.load(Path('world_map/yaml/config.yaml'))
     assert isinstance(cfg.panel, dict)
     assert isinstance(cfg.theme, dict)
     assert isinstance(cfg.events, dict)
@@ -29,12 +29,23 @@ def test_panel_config_route(client_for):
 
 
 def test_load_raises_for_missing_theme(tmp_path):
-    yaml_dir = tmp_path / 'yaml'
-    yaml_dir.mkdir()
-    themes_dir = yaml_dir / 'themes'
-    themes_dir.mkdir()
-    (yaml_dir / 'app_config.yaml').write_text('theme: no_such_theme\n')
-    (yaml_dir / 'info_panel_config.yaml').write_text('{}')
-    (yaml_dir / 'event_visualisation.yaml').write_text('{}')
+    config_path = tmp_path / 'config.yaml'
+    config_path.write_text(
+        'theme: no_such_theme\npanel:\n  title: test\nevents:\n  time: {}\n'
+    )
     with pytest.raises(FileNotFoundError):
-        AppConfig.load(tmp_path)
+        AppConfig.load(config_path)
+
+
+def test_load_raises_for_missing_panel(tmp_path):
+    config_path = tmp_path / 'config.yaml'
+    config_path.write_text('theme: dark_scientific\nevents:\n  time: {}\n')
+    with pytest.raises(KeyError, match="panel"):
+        AppConfig.load(config_path)
+
+
+def test_load_raises_for_missing_events(tmp_path):
+    config_path = tmp_path / 'config.yaml'
+    config_path.write_text('theme: dark_scientific\npanel:\n  title: test\n')
+    with pytest.raises(KeyError, match="events"):
+        AppConfig.load(config_path)
