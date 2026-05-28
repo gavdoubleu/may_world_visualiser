@@ -3,6 +3,8 @@
 import h5py
 import numpy as np
 
+from world_map.core.pagination import calc_total_pages
+
 _SEX_DECODE = {0: 'male', 1: 'female', 2: 'unknown'}
 
 
@@ -12,6 +14,20 @@ class ExplorerLoader:
         self._person_id_to_idx = person_id_to_idx
         self._subset_venue_ids = subset_venue_ids
         self._geography = geography
+
+    def collect_unit_venues(self, unit_name: str) -> list:
+        """Return all Venue objects under unit_name, including descendant units."""
+        unit = self._geography.get_unit(unit_name)
+        if not unit:
+            return []
+
+        def _collect(u):
+            result = list(u.venues)
+            for child in u.children:
+                result.extend(_collect(child))
+            return result
+
+        return _collect(unit)
 
     def load_person_activities(self, person_id: int) -> list[dict] | None:
         """Return ActivityMap records for person_id, or None if not found."""
@@ -117,7 +133,7 @@ class ExplorerLoader:
                     result_subsets.append({
                         'name': sname, 'total': total, 'page': page,
                         'per_page': per_page,
-                        'total_pages': max(1, (total + per_page - 1) // per_page),
+                        'total_pages': calc_total_pages(total, per_page),
                         'members': [],
                     })
                     continue
@@ -154,7 +170,7 @@ class ExplorerLoader:
                     'total':       total,
                     'page':        page,
                     'per_page':    per_page,
-                    'total_pages': max(1, (total + per_page - 1) // per_page),
+                    'total_pages': calc_total_pages(total, per_page),
                     'members':     members,
                 })
 

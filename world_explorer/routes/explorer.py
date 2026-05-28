@@ -7,6 +7,7 @@ import yaml
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
 from world_explorer.context import get_explorer_context
+from world_map.core.pagination import paginate
 from world_map.themes.theme_css import build_root_block
 
 logger = logging.getLogger(__name__)
@@ -61,39 +62,29 @@ def get_tree():
 
 @explorer_bp.route('/api/explorer/unit/<unit_name>/venues')
 def get_unit_venues(unit_name):
-    world = get_explorer_context().world
-    if not world.geography:
+    ctx = get_explorer_context()
+    if not ctx.world.geography:
         return jsonify({'error': 'No geography data'}), 404
-
-    unit = world.geography.get_unit(unit_name)
-    if not unit:
+    if not ctx.world.geography.get_unit(unit_name):
         return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
     venue_type_filter = request.args.get('type')
     page     = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 200)
 
-    def collect_venues(u):
-        result = list(u.venues)
-        for child in u.children:
-            result.extend(collect_venues(child))
-        return result
-
-    all_venues = collect_venues(unit)
+    all_venues = ctx.explorer_loader.collect_unit_venues(unit_name)
     if venue_type_filter:
         all_venues = [v for v in all_venues if v.type == venue_type_filter]
 
-    total_count = len(all_venues)
-    start       = (page - 1) * per_page
-    page_venues = all_venues[start:start + per_page]
+    sl = paginate(all_venues, page, per_page)
 
     return jsonify({
         'unit_name':   unit_name,
         'venue_type':  venue_type_filter,
-        'total_count': total_count,
-        'page':        page,
-        'per_page':    per_page,
-        'total_pages': max(1, (total_count + per_page - 1) // per_page),
+        'total_count': sl.total,
+        'page':        sl.page,
+        'per_page':    sl.per_page,
+        'total_pages': sl.total_pages,
         'venues': [
             {
                 'id':          v.id,
@@ -106,7 +97,7 @@ def get_unit_venues(unit_name):
                     for s_name, s in (v.subsets.items() if hasattr(v, 'subsets') else [])
                 ],
             }
-            for v in page_venues
+            for v in sl.items
         ],
     })
 

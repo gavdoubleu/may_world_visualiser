@@ -79,3 +79,59 @@ def test_load_person_activities_empty_for_no_activities(loader):
 
 def test_load_person_activities_returns_none_for_unknown_id(loader):
     assert loader.load_person_activities(999) is None
+
+
+# --- collect_unit_venues ---
+
+from world_map.core.world_data import GeoUnit, Venue
+
+
+def _make_loader(geography):
+    person_id_to_idx = np.array([], dtype=np.int64)
+    subset_venue_ids = np.array([], dtype=np.int64)
+    return ExplorerLoader.__new__(ExplorerLoader), geography
+
+
+def _loader_with_geography(geography):
+    person_id_to_idx = np.array([], dtype=np.int64)
+    subset_venue_ids = np.array([], dtype=np.int64)
+    loader = ExplorerLoader.__new__(ExplorerLoader)
+    loader._geography = geography
+    loader._hdf5_path = ''
+    loader._person_id_to_idx = person_id_to_idx
+    loader._subset_venue_ids = subset_venue_ids
+    return loader
+
+
+def test_collect_unit_venues_single_unit():
+    world = WorldBuilder().add_unit('London').build_world()
+    unit = world.geography.get_unit('London')
+    unit.venues.append(Venue(1, 'Pub', 'bar'))
+    unit.venues.append(Venue(2, 'Hospital', 'healthcare'))
+
+    loader = _loader_with_geography(world.geography)
+    venues = loader.collect_unit_venues('London')
+    assert len(venues) == 2
+    assert {v.name for v in venues} == {'Pub', 'Hospital'}
+
+
+def test_collect_unit_venues_includes_children():
+    world = WorldBuilder().add_unit('London').add_unit('Camden').build_world()
+    geo = world.geography
+    parent = geo.get_unit('London')
+    child  = geo.get_unit('Camden')
+    child.parent = parent
+    parent.children.append(child)
+
+    parent.venues.append(Venue(1, 'Gallery', 'culture'))
+    child.venues.append(Venue(2, 'School', 'education'))
+
+    loader = _loader_with_geography(geo)
+    venues = loader.collect_unit_venues('London')
+    assert {v.name for v in venues} == {'Gallery', 'School'}
+
+
+def test_collect_unit_venues_unknown_unit_returns_empty():
+    world = WorldBuilder().add_unit('London').build_world()
+    loader = _loader_with_geography(world.geography)
+    assert loader.collect_unit_venues('Atlantis') == []

@@ -5,6 +5,7 @@ import logging
 
 from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
+from world_map.core.pagination import paginate
 
 logger = logging.getLogger(__name__)
 
@@ -153,11 +154,10 @@ def get_unit_people(unit_name):
         all_people = unit.get_people() if include_descendants else (list(unit.people) if unit.people else [])
         total_count = len(all_people)
 
-        start_idx = (page - 1) * per_page
-        paginated_people = all_people[start_idx:start_idx + per_page]
+        sl = paginate(all_people, page, per_page)
 
         people_data = []
-        for person in paginated_people:
+        for person in sl.items:
             primary_activity = None
             if hasattr(person, 'activity_map') and person.activity_map:
                 if 'primary_activity' in person.activity_map:
@@ -180,12 +180,12 @@ def get_unit_people(unit_name):
             })
 
         return jsonify({
-            'unit_name': unit_name,
-            'total_count': total_count,
-            'page': page,
-            'per_page': per_page,
-            'total_pages': (total_count + per_page - 1) // per_page,
-            'people': people_data
+            'unit_name':   unit_name,
+            'total_count': sl.total,
+            'page':        sl.page,
+            'per_page':    sl.per_page,
+            'total_pages': sl.total_pages,
+            'people':      people_data,
         })
 
     except Exception as e:
