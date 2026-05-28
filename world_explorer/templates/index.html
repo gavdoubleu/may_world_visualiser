@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Explorer</title>
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <header id="header">
+      <div class="header-brand">
+        <span class="header-title">World Explorer</span>
+      </div>
+      <div id="header-stats" class="header-stats">Loading…</div>
+    </header>
+
+    <div id="main">
+
+      <div id="tree-pane">
+        <div class="pane-header">Geography</div>
+        <div id="tree-scroll">
+          <ul id="geo-tree" class="tree-root"></ul>
+        </div>
+      </div>
+
+      <div id="detail-pane">
+        <div id="unit-placeholder">
+          <span>Select a geographic unit from the tree</span>
+        </div>
+        <div id="unit-detail" hidden>
+          <div id="unit-title-row"></div>
+          <div id="stats-strip-container"></div>
+          <div id="distributions-container"></div>
+          <div id="venues-container"></div>
+          <div id="people-container"></div>
+        </div>
+      </div>
+
+      <div id="person-panel">
+        <div class="person-panel__header">
+          <span class="person-panel__title" id="person-panel-title">Person Detail</span>
+          <button class="btn-close" id="close-person-panel" title="Close">✕</button>
+        </div>
+        <div class="person-panel__body" id="person-panel-content"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
