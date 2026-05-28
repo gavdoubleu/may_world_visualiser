@@ -858,12 +858,12 @@ function buildActivitiesHtml(activities) {
       <div class="activity-map-header">
         <span class="activity-map-type">${esc(a.activity_name)}</span>
         <button class="icon-btn"
-                data-action="open-venue-members"
+                data-action="go-to-venue"
                 data-venue-id="${a.venue_id}"
                 data-venue-name="${esc(a.venue_name)}"
                 data-venue-type="${esc(a.venue_type)}"
                 data-venue-geo-unit="${esc(a.venue_geo_unit)}"
-                title="View venue members / go to venue">
+                title="Go to venue in main window">
           <img src="/static/images/to_venue_logo.svg" alt="Go to venue">
         </button>
       </div>
@@ -1021,6 +1021,17 @@ async function handlePanelClick(e) {
     await openVenueMembersPanel(
       Number(venueBtn.dataset.venueId),
       venueBtn.dataset.venueName
+    );
+    return;
+  }
+
+  const gotoVenueBtn = e.target.closest('[data-action="go-to-venue"]');
+  if (gotoVenueBtn) {
+    e.stopPropagation();
+    await goToVenue(
+      Number(gotoVenueBtn.dataset.venueId),
+      gotoVenueBtn.dataset.venueType,
+      gotoVenueBtn.dataset.venueGeoUnit,
     );
   }
 }
