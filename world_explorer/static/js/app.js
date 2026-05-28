@@ -391,7 +391,23 @@ function renderVenuesSection() {
       ${groups}
     </div>`;
 
-  document.getElementById('venues-container').addEventListener('click', handleVenueClick);
+  const venuesContainer = document.getElementById('venues-container');
+  venuesContainer.addEventListener('click', handleVenueClick);
+
+  const jumpToVenuePage = async (input) => {
+    const type  = input.dataset.type;
+    const total = Number(input.dataset.total);
+    const page  = Math.max(1, Math.min(Number(input.value), total));
+    if (type && page) await fetchVenuePage(state.selectedUnit, type, page);
+  };
+  venuesContainer.addEventListener('keydown', async (e) => {
+    const input = e.target.closest('[data-action="venue-jump"]');
+    if (input && e.key === 'Enter') await jumpToVenuePage(input);
+  });
+  venuesContainer.addEventListener('change', async (e) => {
+    const input = e.target.closest('[data-action="venue-jump"]');
+    if (input) await jumpToVenuePage(input);
+  });
 
   // Auto-highlight target venue after navigation
   if (state.highlightVenueId && state.highlightVenueType) {
@@ -471,14 +487,18 @@ function buildVenueExpandHtml(venue) {
 
 function buildVenuePaginationHtml(type, vs) {
   const showing = vs.items.length + (vs.page - 1) * 50;
+  const totalPages = Math.max(1, Math.ceil(vs.total / vs.per_page));
   return `
     <div class="venue-pagination">
       <span>Showing ${fmt(showing)} of ${fmt(vs.total)}</span>
       ${vs.page > 1
         ? `<button data-action="venue-prev" data-type="${esc(type)}" style="margin-left:auto">← Prev</button>`
         : ''}
+      <input type="number" class="page-input" data-action="venue-jump"
+             data-type="${esc(type)}" data-total="${totalPages}"
+             value="${vs.page}" min="1" max="${totalPages}" ${vs.page === 1 && showing >= vs.total ? 'style="margin-left:auto"' : ''}>
       ${showing < vs.total
-        ? `<button data-action="venue-next" data-type="${esc(type)}" ${vs.page === 1 ? 'style="margin-left:auto"' : ''}>Next →</button>`
+        ? `<button data-action="venue-next" data-type="${esc(type)}">Next →</button>`
         : ''}
     </div>`;
 }
@@ -679,7 +699,11 @@ function renderPeoplePagination(data) {
     <div class="pagination">
       <button ${data.page <= 1 ? 'disabled' : ''}
               data-action="people-prev">← Prev</button>
-      <span class="page-info">Page ${data.page} of ${data.total_pages}</span>
+      <span class="page-info">
+        Page <input type="number" class="page-input" data-action="people-jump"
+                    data-total="${data.total_pages}" value="${data.page}" min="1" max="${data.total_pages}">
+        of ${data.total_pages}
+      </span>
       <button ${data.page >= data.total_pages ? 'disabled' : ''}
               data-action="people-next">Next →</button>
       <span class="total-info">${fmt(data.total_count)} total</span>
@@ -709,6 +733,20 @@ function bindPeopleEvents() {
     } else if (nextBtn && !nextBtn.disabled && state.peopleData) {
       await loadPeople(state.selectedUnit, state.peopleData.page + 1);
     }
+  });
+
+  section.addEventListener('keydown', async (e) => {
+    const input = e.target.closest('[data-action="people-jump"]');
+    if (!input || e.key !== 'Enter') return;
+    const page = Math.max(1, Math.min(Number(input.value), Number(input.dataset.total)));
+    if (page && state.selectedUnit) await loadPeople(state.selectedUnit, page);
+  });
+
+  section.addEventListener('change', async (e) => {
+    const input = e.target.closest('[data-action="people-jump"]');
+    if (!input) return;
+    const page = Math.max(1, Math.min(Number(input.value), Number(input.dataset.total)));
+    if (page && state.selectedUnit) await loadPeople(state.selectedUnit, page);
   });
 }
 
@@ -858,7 +896,7 @@ async function openVenueMembersPanel(venueId, venueName, { pushHistory = true } 
 
   document.getElementById('person-panel-title').textContent = `Members: ${data.venue_name || venueName}`;
   content.innerHTML = buildVenueMembersHtml(data);
-  content.addEventListener('click', handleVenueMembersClick);
+  bindVenueMembersEvents(content);
 }
 
 function buildVenueMembersHtml(data) {
@@ -890,7 +928,11 @@ function buildVenueMembersHtml(data) {
                     data-subset="${esc(subset.name)}"
                     data-venue-id="${data.venue_id}">← Prev</button>`
           : ''}
-        <span class="page-info">Page ${subset.page}/${subset.total_pages}</span>
+        <input type="number" class="page-input" data-action="member-jump"
+               data-subset="${esc(subset.name)}" data-venue-id="${data.venue_id}"
+               data-total="${subset.total_pages}"
+               value="${subset.page}" min="1" max="${subset.total_pages}">
+        <span class="page-info">of ${subset.total_pages}</span>
         ${subset.page < subset.total_pages
           ? `<button class="nav-btn" data-action="member-next"
                     data-subset="${esc(subset.name)}"
@@ -929,29 +971,45 @@ async function handleVenueMembersClick(e) {
   }
 
   if (prevBtn || nextBtn) {
-    const btn       = prevBtn || nextBtn;
+    const btn        = prevBtn || nextBtn;
     const subsetName = btn.dataset.subset;
-    const venueId   = Number(btn.dataset.venueId);
-    const content   = document.getElementById('person-panel-content');
-    const titleEl   = document.getElementById('person-panel-title');
-    const venueName = titleEl.textContent.replace(/^Members:\s*/, '');
-
+    const venueId    = Number(btn.dataset.venueId);
     const details    = btn.closest('details');
-    const currentPage = Number(details.querySelector('.page-info')?.textContent.match(/Page (\d+)/)?.[1] || 1);
-    const newPage    = prevBtn ? currentPage - 1 : currentPage + 1;
-
-    content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading…</div>';
-    let data;
-    try {
-      data = await fetchJson(`/api/explorer/venue/${venueId}/members?subset=${encodeURIComponent(subsetName)}&page=${newPage}`);
-    } catch (err) {
-      content.innerHTML = `<div style="color:var(--theme-text-muted)">Error: ${esc(err.message)}</div>`;
-      return;
-    }
-    content.innerHTML = buildVenueMembersHtml(data);
-    content.addEventListener('click', handleVenueMembersClick);
+    const jumpInput  = details.querySelector('[data-action="member-jump"]');
+    const currentPage = jumpInput ? Number(jumpInput.value) : 1;
+    await loadMemberPage(venueId, subsetName, prevBtn ? currentPage - 1 : currentPage + 1);
     return;
   }
+}
+
+async function loadMemberPage(venueId, subsetName, page) {
+  const content = document.getElementById('person-panel-content');
+  content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading…</div>';
+  let data;
+  try {
+    data = await fetchJson(`/api/explorer/venue/${venueId}/members?subset=${encodeURIComponent(subsetName)}&page=${page}`);
+  } catch (err) {
+    content.innerHTML = `<div style="color:var(--theme-text-muted)">Error: ${esc(err.message)}</div>`;
+    return;
+  }
+  content.innerHTML = buildVenueMembersHtml(data);
+  bindVenueMembersEvents(content);
+}
+
+function bindVenueMembersEvents(container) {
+  container.addEventListener('click', handleVenueMembersClick);
+  container.addEventListener('keydown', async (e) => {
+    const input = e.target.closest('[data-action="member-jump"]');
+    if (!input || e.key !== 'Enter') return;
+    const page = Math.max(1, Math.min(Number(input.value), Number(input.dataset.total)));
+    await loadMemberPage(Number(input.dataset.venueId), input.dataset.subset, page);
+  });
+  container.addEventListener('change', async (e) => {
+    const input = e.target.closest('[data-action="member-jump"]');
+    if (!input) return;
+    const page = Math.max(1, Math.min(Number(input.value), Number(input.dataset.total)));
+    await loadMemberPage(Number(input.dataset.venueId), input.dataset.subset, page);
+  });
 }
 
 // ── panel click dispatcher ────────────────────────────────────────────────────

@@ -547,6 +547,21 @@ tr.person-expand-row td {
 .pagination .page-info { margin: 0 0.25rem; }
 .pagination .total-info { margin-left: auto; }
 
+.page-input {
+  width: 3rem;
+  padding: 0.1rem 0.25rem;
+  background: var(--theme-surface-raised);
+  border: 1px solid var(--theme-border);
+  color: var(--theme-text);
+  border-radius: 3px;
+  font-size: 0.74rem;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.page-input::-webkit-inner-spin-button,
+.page-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.page-input:focus { outline: none; border-color: var(--theme-accent); }
+
 /* ── detail nav row ─────────────────────────────────────────────────────────── */
 
 #detail-nav-row {
