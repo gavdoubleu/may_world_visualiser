@@ -17,7 +17,10 @@ An individual resident assigned to exactly one GeoUnit. Carries slim attributes:
 A location assigned to a GeoUnit, of a named VenueType. Contains zero or more Subsets.
 
 **Subset**
-A named membership group within a Venue (e.g. a household within a building). Carries a member count (slim mode only — individual member ids are not loaded). Full member detail (id, age, sex, geo_unit) is loaded on demand via the venue-members API.
+A named membership group within a Venue (e.g. a household within a building). In the Venue list, only a member count is shown. Full member detail (id, age, sex, geo_unit) is loaded on demand when a Venue is opened in the Detail Panel.
+
+**ActivityMap**
+The full set of activities for a single Person, loaded on demand in the Detail Panel. Each entry records the activity type, the Venue where it takes place, the Subset within that Venue, and the Venue's GeoUnit. The slim Person object carries only a list of activity type strings; the ActivityMap is the on-demand expansion.
 
 **VenueType**
 A string label classifying Venues (e.g. `household`, `school`, `workplace`). The set of types is world-specific and read from the HDF5 registry.
@@ -31,4 +34,7 @@ Pre-computed aggregate statistics for a GeoUnit: total population, age distribut
 Interactive map-based visualisation of a world file. Renders GeoUnits and Venues on a geographic map with event overlays. Flask app; launched via `launch_world_map.py`.
 
 **WorldExplorer** (`world_explorer/`)
-File-explorer-style browser interface for inspecting a world file. Left pane shows the GeoUnit hierarchy as a collapsible tree. Right pane shows UnitStats, a paginated Venue list (grouped by VenueType, inline-expandable), and a paginated People list (inline-expandable slim detail, with a slide-in panel for full Person detail). Flask app; launched via `launch_world_explorer.py` on port 5001. Imports loaders and data classes from `world_map.core`.
+File-explorer-style browser interface for inspecting a world file. Left pane shows the GeoUnit hierarchy as a collapsible tree. Right pane shows UnitStats, a paginated Venue list (grouped by VenueType, inline-expandable), and a paginated People list (inline-expandable slim detail). Both Venues and People have a "View full details" button that opens the Detail Panel. Flask app; launched via `launch_world_explorer.py` on port 5001. Imports loaders and data classes from `world_map.core`.
+
+**Detail Panel**
+The slide-in panel on the right edge of WorldExplorer. Displays full detail for a single domain object (Person or Venue). For a Person: id, age, sex, geo_unit, properties, and activity map. For a Venue: name, type, geo_unit, coordinates, properties, and member list (paginated by Subset). Panel history supports back/forward navigation.

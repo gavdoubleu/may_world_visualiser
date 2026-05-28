@@ -610,9 +610,9 @@ tr.person-expand-row td {
 }
 .icon-btn:hover img { filter: brightness(0) invert(1); }
 
-/* ── person slide panel ─────────────────────────────────────────────────────── */
+/* ── detail slide panel ─────────────────────────────────────────────────────── */
 
-#person-panel {
+#detail-panel {
   width: 380px;
   flex-shrink: 0;
   border-left: 1px solid var(--theme-border);
@@ -627,12 +627,12 @@ tr.person-expand-row td {
   transition: transform 0.22s ease, margin-right 0.22s ease;
 }
 
-#person-panel.open {
+#detail-panel.open {
   transform: translateX(0);
   margin-right: 0;
 }
 
-.person-panel__header {
+.detail-panel__header {
   display: flex;
   align-items: center;
   gap: 0.3rem;
@@ -642,7 +642,7 @@ tr.person-expand-row td {
   flex-shrink: 0;
 }
 
-.person-panel__title {
+.detail-panel__title {
   flex: 1;
   font-family: var(--font-display, monospace), monospace;
   font-size: 0.9rem;
@@ -662,13 +662,13 @@ tr.person-expand-row td {
 }
 .btn-close:hover { color: var(--theme-text); background: var(--theme-button-hover-bg); }
 
-.person-panel__body {
+.detail-panel__body {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
 }
 
-/* ── detail grid (person panel) ─────────────────────────────────────────────── */
+/* ── detail grid (detail panel) ─────────────────────────────────────────────── */
 
 .detail-grid {
   display: grid;

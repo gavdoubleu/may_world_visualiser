@@ -196,6 +196,29 @@ def get_person_full(person_id):
     return jsonify({'activities': activities})
 
 
+@explorer_bp.route('/api/explorer/venue/<int:venue_id>/detail')
+def get_venue_detail(venue_id):
+    """Return metadata for a single venue."""
+    world = get_app_context().world
+    all_venues = world.venues.get_all_venues()
+    venue = all_venues.get(venue_id)
+    if not venue:
+        return jsonify({'error': f'Venue {venue_id} not found'}), 404
+    geo_unit = venue.geographical_unit
+    return jsonify({
+        'id':          venue.id,
+        'name':        venue.name,
+        'type':        venue.type,
+        'geo_unit':    geo_unit.name if geo_unit else None,
+        'coordinates': venue.coordinates,
+        'properties':  venue.properties or {},
+        'subsets': [
+            {'name': s_name, 'num_members': s.num_members}
+            for s_name, s in venue.subsets.items()
+        ],
+    })
+
+
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/members')
 def get_venue_members(venue_id):
     """Return subset member lists for a venue, read on-demand from HDF5."""

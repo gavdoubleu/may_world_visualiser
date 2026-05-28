@@ -25,8 +25,8 @@ const state = {
 // ── bootstrap ─────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('close-person-panel')
-    .addEventListener('click', closeSidePanel);
+  document.getElementById('close-detail-panel')
+    .addEventListener('click', closeDetailPanel);
   document.getElementById('nav-back-btn')
     .addEventListener('click', navigateMainBack);
   document.getElementById('nav-fwd-btn')
@@ -125,8 +125,8 @@ function navigatePanelForward() {
 async function renderPanelEntry(entry, { pushHistory = true } = {}) {
   if (entry.type === 'person') {
     await openPersonPanel(entry.id, { pushHistory });
-  } else if (entry.type === 'venue_members') {
-    await openVenueMembersPanel(entry.id, entry.name, { pushHistory });
+  } else if (entry.type === 'venue_details') {
+    await openVenueDetailsPanel(entry.id, entry.name, { pushHistory });
   }
 }
 
@@ -445,12 +445,6 @@ function buildVenueListHtml(type, vs) {
            data-action="toggle-venue" data-venue-id="${v.id}">
         <span class="venue-item__toggle">${isExpanded ? '▼' : '▶'}</span>
         <span class="venue-item__name">${esc(v.name)}</span>
-        ${isExpanded ? `
-          <button class="icon-btn" data-action="open-venue-members"
-                  data-venue-id="${v.id}" data-venue-name="${esc(v.name)}"
-                  title="View full member list">
-            <img src="/static/images/to_venue_logo.svg" alt="Members">
-          </button>` : ''}
       </div>
       ${expandHtml}`;
   }).join('');
@@ -467,10 +461,6 @@ function buildVenueExpandHtml(venue) {
   const subsets = (venue.subsets || []);
   const props   = Object.entries(venue.properties || {}).filter(([, v]) => v !== null && v !== undefined);
 
-  if (subsets.length === 0 && props.length === 0) {
-    return `<div class="venue-subsets"><span class="empty-hint">No subsets or properties.</span></div>`;
-  }
-
   let lines = [];
   if (subsets.length > 0) {
     lines.push('<strong>Subsets</strong>');
@@ -482,7 +472,22 @@ function buildVenueExpandHtml(venue) {
     props.forEach(([k, v]) => lines.push(`${esc(k)}: ${esc(String(v))}`));
   }
 
-  return `<div class="venue-subsets">${lines.join('<br>')}</div>`;
+  const bodyHtml = lines.length > 0
+    ? `<div>${lines.join('<br>')}</div>`
+    : '<span class="empty-hint">No subsets or properties.</span>';
+
+  return `
+    <div class="venue-subsets">
+      ${bodyHtml}
+      <div>
+        <button class="btn-details"
+                data-action="open-venue-details"
+                data-venue-id="${venue.id}"
+                data-venue-name="${esc(venue.name)}">
+          View full details →
+        </button>
+      </div>
+    </div>`;
 }
 
 function buildVenuePaginationHtml(type, vs) {
@@ -504,17 +509,17 @@ function buildVenuePaginationHtml(type, vs) {
 }
 
 async function handleVenueClick(e) {
-  const openMembers  = e.target.closest('[data-action="open-venue-members"]');
+  const openDetails  = e.target.closest('[data-action="open-venue-details"]');
   const toggleGroup  = e.target.closest('[data-action="toggle-venue-group"]');
   const toggleVenue  = e.target.closest('[data-action="toggle-venue"]');
   const venuePrev    = e.target.closest('[data-action="venue-prev"]');
   const venueNext    = e.target.closest('[data-action="venue-next"]');
 
-  if (openMembers) {
+  if (openDetails) {
     e.stopPropagation();
-    await openVenueMembersPanel(
-      Number(openMembers.dataset.venueId),
-      openMembers.dataset.venueName
+    await openVenueDetailsPanel(
+      Number(openDetails.dataset.venueId),
+      openDetails.dataset.venueName
     );
     return;
   }
@@ -752,18 +757,18 @@ function bindPeopleEvents() {
 
 // ── side panel ────────────────────────────────────────────────────────────────
 
-function closeSidePanel() {
-  document.getElementById('person-panel').classList.remove('open');
+function closeDetailPanel() {
+  document.getElementById('detail-panel').classList.remove('open');
 }
 
-// ── person panel ──────────────────────────────────────────────────────────────
+// ── person detail panel ───────────────────────────────────────────────────────
 
 async function openPersonPanel(personId, { pushHistory = true } = {}) {
   if (pushHistory) pushPanelHistory({ type: 'person', id: personId });
 
-  const panel   = document.getElementById('person-panel');
-  const content = document.getElementById('person-panel-content');
-  document.getElementById('person-panel-title').textContent = `Person ${personId}`;
+  const panel   = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-panel-content');
+  document.getElementById('detail-panel-title').textContent = `Person ${personId}`;
   content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading…</div>';
   panel.classList.add('open');
 
@@ -875,29 +880,94 @@ function buildActivitiesHtml(activities) {
     </div>`).join('');
 }
 
-// ── venue members panel ────────────────────────────────────────────────────────
+// ── venue details panel ───────────────────────────────────────────────────────
 
-async function openVenueMembersPanel(venueId, venueName, { pushHistory = true } = {}) {
-  if (pushHistory) pushPanelHistory({ type: 'venue_members', id: venueId, name: venueName });
+async function openVenueDetailsPanel(venueId, venueName, { pushHistory = true } = {}) {
+  if (pushHistory) pushPanelHistory({ type: 'venue_details', id: venueId, name: venueName });
 
-  const panel   = document.getElementById('person-panel');
-  const content = document.getElementById('person-panel-content');
-  document.getElementById('person-panel-title').textContent = `Members: ${venueName || venueId}`;
-  content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading from file…</div>';
+  const panel   = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-panel-content');
+  document.getElementById('detail-panel-title').textContent = venueName || `Venue ${venueId}`;
+  content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading…</div>';
   panel.classList.add('open');
 
-  let data;
+  let detail;
   try {
-    data = await fetchJson(`/api/explorer/venue/${venueId}/members`);
+    detail = await fetchJson(`/api/explorer/venue/${venueId}/detail`);
   } catch (err) {
     content.innerHTML = `<div style="color:var(--theme-text-muted);font-size:0.82rem">Error: ${esc(err.message)}</div>`;
     return;
   }
 
-  document.getElementById('person-panel-title').textContent = `Members: ${data.venue_name || venueName}`;
-  content.innerHTML = buildVenueMembersHtml(data);
-  bindVenueMembersEvents(content);
+  document.getElementById('detail-panel-title').textContent = detail.name || venueName;
+  content.innerHTML = buildVenueDetailHtml(detail);
+  loadVenueDetailMembers(venueId, content);
+  content.addEventListener('click', handlePanelClick);
 }
+
+function buildVenueDetailHtml(venue) {
+  const coords = venue.coordinates;
+  const props  = Object.entries(venue.properties || {}).filter(([, v]) => v !== null);
+
+  let html = `
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-item__label">Name</div>
+        <div class="detail-item__value">${esc(venue.name)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item__label">Type</div>
+        <div class="detail-item__value">${esc(venue.type)}</div>
+      </div>
+      ${venue.geo_unit ? `
+      <div class="detail-item">
+        <div class="detail-item__label">Geo unit</div>
+        <div class="detail-item__value" style="font-size:0.8rem">${esc(venue.geo_unit)}</div>
+      </div>` : ''}
+      ${coords ? `
+      <div class="detail-item">
+        <div class="detail-item__label">Coordinates</div>
+        <div class="detail-item__value" style="font-size:0.8rem">${esc(String(coords))}</div>
+      </div>` : ''}
+    </div>`;
+
+  if (props.length > 0) {
+    html += `<div class="detail-section-title">Properties</div><div class="detail-grid">`;
+    for (const [k, v] of props) {
+      html += `
+        <div class="detail-item">
+          <div class="detail-item__label">${esc(k)}</div>
+          <div class="detail-item__value" style="font-size:0.82rem">${esc(String(v))}</div>
+        </div>`;
+    }
+    html += '</div>';
+  }
+
+  html += `<div class="detail-section-title">Members</div>
+    <div id="venue-members-section">
+      <div style="color:var(--theme-text-muted);font-size:0.82rem">Loading from file…</div>
+    </div>`;
+
+  return html;
+}
+
+async function loadVenueDetailMembers(venueId, container) {
+  const section = container.querySelector('#venue-members-section');
+  if (!section) return;
+
+  let data;
+  try {
+    data = await fetchJson(`/api/explorer/venue/${venueId}/members`);
+  } catch (err) {
+    section.innerHTML = `<div style="color:var(--theme-text-muted)">Error: ${esc(err.message)}</div>`;
+    return;
+  }
+
+  section.innerHTML = buildVenueMembersHtml(data);
+  bindVenueMembersEvents(section);
+}
+
+// ── venue members rendering ───────────────────────────────────────────────────
 
 function buildVenueMembersHtml(data) {
   if (!data.subsets || data.subsets.length === 0) {
@@ -983,7 +1053,7 @@ async function handleVenueMembersClick(e) {
 }
 
 async function loadMemberPage(venueId, subsetName, page) {
-  const content = document.getElementById('person-panel-content');
+  const content = document.getElementById('detail-panel-content');
   content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading…</div>';
   let data;
   try {
@@ -1015,16 +1085,6 @@ function bindVenueMembersEvents(container) {
 // ── panel click dispatcher ────────────────────────────────────────────────────
 
 async function handlePanelClick(e) {
-  const venueBtn = e.target.closest('[data-action="open-venue-members"]');
-  if (venueBtn) {
-    e.stopPropagation();
-    await openVenueMembersPanel(
-      Number(venueBtn.dataset.venueId),
-      venueBtn.dataset.venueName
-    );
-    return;
-  }
-
   const gotoVenueBtn = e.target.closest('[data-action="go-to-venue"]');
   if (gotoVenueBtn) {
     e.stopPropagation();
