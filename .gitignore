@@ -6,3 +6,6 @@ data/
 *.jpg
 outputs/
 log*.txt
+*.pyc
+log*.txt
+tmp/
