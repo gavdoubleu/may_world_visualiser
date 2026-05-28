@@ -17,7 +17,7 @@ An individual resident assigned to exactly one GeoUnit. Carries slim attributes:
 A location assigned to a GeoUnit, of a named VenueType. Contains zero or more Subsets.
 
 **Subset**
-A named membership group within a Venue (e.g. a household within a building). Carries a member count (slim mode only — individual member ids are not loaded).
+A named membership group within a Venue (e.g. a household within a building). Carries a member count (slim mode only — individual member ids are not loaded). Full member detail (id, age, sex, geo_unit) is loaded on demand via the venue-members API.
 
 **VenueType**
 A string label classifying Venues (e.g. `household`, `school`, `workplace`). The set of types is world-specific and read from the HDF5 registry.

@@ -201,6 +201,7 @@ def get_venue_members(venue_id):
     """Return subset member lists for a venue, read on-demand from HDF5."""
     hdf5_path        = current_app.config.get('HDF5_PATH')
     subset_venue_ids = current_app.config.get('SUBSET_VENUE_IDS')
+    person_id_to_idx = current_app.config.get('PERSON_ID_TO_IDX')
     world            = get_app_context().world
 
     per_page          = min(request.args.get('per_page', 50, type=int), 200)
@@ -254,9 +255,10 @@ def get_venue_members(venue_id):
                 })
                 continue
 
-            page_idxs = np.array(members_flat[page_start:page_end], dtype=np.int64)
-            sort_order = np.argsort(page_idxs)
-            sorted_idxs = page_idxs[sort_order]
+            page_idxs  = np.array(members_flat[page_start:page_end], dtype=np.int64)
+            array_idxs = person_id_to_idx[page_idxs]  # person IDs → array positions
+            sort_order = np.argsort(array_idxs)
+            sorted_idxs = array_idxs[sort_order]
             idx_list   = sorted_idxs.tolist()
 
             ids_b    = pop_ids[idx_list]
