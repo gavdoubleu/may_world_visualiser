@@ -1,27 +1,44 @@
 'use strict';
 
-// ── state ────────────────────────────────────────────────────────────────────
+// ── state ─────────────────────────────────────────────────────────────────────
 
 const state = {
-  nodeMap:         {},     // id (number) → node
-  expandedIds:     new Set(),
-  selectedUnit:    null,   // unit name string
-  currentUnit:     null,   // API response from /api/geography/unit/<name>
-  venueStates:     {},     // venue_type → {open, page, items, total, totalPages}
-  expandedVenueId: null,
-  expandedPersonId: null,
-  peopleData:      null,   // last response from /api/geography/unit/<name>/people
+  nodeMap:           {},
+  expandedIds:       new Set(),
+  selectedUnit:      null,
+  currentUnit:       null,
+  venueStates:       {},
+  expandedVenueId:   null,
+  expandedPersonId:  null,
+  peopleData:        null,
+  highlightPersonId: null,
+  highlightVenueId:  null,
+  highlightVenueType: null,
+
+  mainHistory:    [],   // [{unit}], max 10
+  mainHistoryIdx: -1,
+
+  panelStack:    [],    // [{type, id, name}]
+  panelStackIdx: -1,
 };
 
 // ── bootstrap ─────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('close-person-panel')
-    .addEventListener('click', closePersonPanel);
+    .addEventListener('click', closeSidePanel);
+  document.getElementById('nav-back-btn')
+    .addEventListener('click', navigateMainBack);
+  document.getElementById('nav-fwd-btn')
+    .addEventListener('click', navigateMainForward);
+  document.getElementById('panel-back-btn')
+    .addEventListener('click', navigatePanelBack);
+  document.getElementById('panel-fwd-btn')
+    .addEventListener('click', navigatePanelForward);
   loadTree();
 });
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 function esc(str) {
   return String(str)
@@ -42,7 +59,78 @@ async function fetchJson(url) {
   return resp.json();
 }
 
-// ── tree ─────────────────────────────────────────────────────────────────────
+// ── main window history ────────────────────────────────────────────────────────
+
+function pushMainHistory(unitName) {
+  state.mainHistory = state.mainHistory.slice(0, state.mainHistoryIdx + 1);
+  state.mainHistory.push({ unit: unitName });
+  if (state.mainHistory.length > 10) state.mainHistory.shift();
+  state.mainHistoryIdx = state.mainHistory.length - 1;
+  updateMainNavButtons();
+}
+
+function updateMainNavButtons() {
+  const back = document.getElementById('nav-back-btn');
+  const fwd  = document.getElementById('nav-fwd-btn');
+  if (back) back.disabled = state.mainHistoryIdx <= 0;
+  if (fwd)  fwd.disabled  = state.mainHistoryIdx >= state.mainHistory.length - 1;
+}
+
+function navigateMainBack() {
+  if (state.mainHistoryIdx <= 0) return;
+  state.mainHistoryIdx--;
+  updateMainNavButtons();
+  const entry = state.mainHistory[state.mainHistoryIdx];
+  loadUnit(entry.unit, { pushHistory: false });
+}
+
+function navigateMainForward() {
+  if (state.mainHistoryIdx >= state.mainHistory.length - 1) return;
+  state.mainHistoryIdx++;
+  updateMainNavButtons();
+  const entry = state.mainHistory[state.mainHistoryIdx];
+  loadUnit(entry.unit, { pushHistory: false });
+}
+
+// ── panel history ─────────────────────────────────────────────────────────────
+
+function pushPanelHistory(entry) {
+  state.panelStack = state.panelStack.slice(0, state.panelStackIdx + 1);
+  state.panelStack.push(entry);
+  state.panelStackIdx = state.panelStack.length - 1;
+  updatePanelNavButtons();
+}
+
+function updatePanelNavButtons() {
+  const back = document.getElementById('panel-back-btn');
+  const fwd  = document.getElementById('panel-fwd-btn');
+  if (back) back.disabled = state.panelStackIdx <= 0;
+  if (fwd)  fwd.disabled  = state.panelStackIdx >= state.panelStack.length - 1;
+}
+
+function navigatePanelBack() {
+  if (state.panelStackIdx <= 0) return;
+  state.panelStackIdx--;
+  updatePanelNavButtons();
+  renderPanelEntry(state.panelStack[state.panelStackIdx], { pushHistory: false });
+}
+
+function navigatePanelForward() {
+  if (state.panelStackIdx >= state.panelStack.length - 1) return;
+  state.panelStackIdx++;
+  updatePanelNavButtons();
+  renderPanelEntry(state.panelStack[state.panelStackIdx], { pushHistory: false });
+}
+
+async function renderPanelEntry(entry, { pushHistory = true } = {}) {
+  if (entry.type === 'person') {
+    await openPersonPanel(entry.id, { pushHistory });
+  } else if (entry.type === 'venue_members') {
+    await openVenueMembersPanel(entry.id, entry.name, { pushHistory });
+  }
+}
+
+// ── tree ──────────────────────────────────────────────────────────────────────
 
 async function loadTree() {
   let nodes;
@@ -131,18 +219,20 @@ function rerenderTree() {
   document.getElementById('geo-tree').innerHTML = renderNodeList(roots, 0);
 }
 
-// ── unit loading ──────────────────────────────────────────────────────────────
+// ── unit loading ───────────────────────────────────────────────────────────────
 
-async function loadUnit(name) {
-  if (state.selectedUnit === name) return;
+async function loadUnit(name, { pushHistory = true } = {}) {
+  if (state.selectedUnit === name && pushHistory &&
+      !state.highlightPersonId && !state.highlightVenueId) return;
 
-  state.selectedUnit    = name;
-  state.currentUnit     = null;
-  state.venueStates     = {};
-  state.expandedVenueId = null;
+  if (pushHistory) pushMainHistory(name);
+
+  state.selectedUnit     = name;
+  state.currentUnit      = null;
+  state.venueStates      = {};
+  state.expandedVenueId  = null;
   state.expandedPersonId = null;
-  state.peopleData      = null;
-  closePersonPanel();
+  state.peopleData       = null;
   rerenderTree();
 
   const placeholder = document.getElementById('unit-placeholder');
@@ -169,11 +259,11 @@ async function loadUnit(name) {
 }
 
 function setDetailLoading() {
-  document.getElementById('unit-title-row').innerHTML        = '';
-  document.getElementById('stats-strip-container').innerHTML = '';
+  document.getElementById('unit-title-row').innerHTML          = '';
+  document.getElementById('stats-strip-container').innerHTML   = '';
   document.getElementById('distributions-container').innerHTML = '';
-  document.getElementById('venues-container').innerHTML      = '';
-  document.getElementById('people-container').innerHTML      =
+  document.getElementById('venues-container').innerHTML        = '';
+  document.getElementById('people-container').innerHTML        =
     '<div style="padding:1rem;color:var(--theme-text-muted);font-size:0.82rem">Loading…</div>';
 }
 
@@ -197,7 +287,7 @@ function renderUnitHeader(unit) {
 }
 
 function renderStatsStrip(unit) {
-  const totalVenues = Object.values(unit.venue_types || {}).reduce((s, v) => s + v, 0);
+  const totalVenues   = Object.values(unit.venue_types || {}).reduce((s, v) => s + v, 0);
   const childrenCount = (unit.children || []).length;
 
   let cards = `
@@ -222,8 +312,8 @@ function renderStatsStrip(unit) {
 }
 
 function renderDistributions(unit) {
-  const ageDist = unit.age_distribution || {};
-  const sexDist = unit.sex_distribution || {};
+  const ageDist  = unit.age_distribution || {};
+  const sexDist  = unit.sex_distribution || {};
   const ageTotal = Object.values(ageDist).reduce((s, v) => s + v, 0);
   const sexTotal = Object.values(sexDist).reduce((s, v) => s + v, 0);
 
@@ -266,10 +356,10 @@ function renderDistributions(unit) {
   document.getElementById('distributions-container').innerHTML = html;
 }
 
-// ── venues section ────────────────────────────────────────────────────────────
+// ── venues section ─────────────────────────────────────────────────────────────
 
 function renderVenuesSection() {
-  const unit = state.currentUnit;
+  const unit       = state.currentUnit;
   const venueTypes = unit.venue_types || {};
   const totalVenues = Object.values(venueTypes).reduce((s, v) => s + v, 0);
 
@@ -279,7 +369,7 @@ function renderVenuesSection() {
   }
 
   const groups = Object.entries(venueTypes).map(([type, count]) => {
-    const vs = state.venueStates[type] || { open: false, page: 1, items: [], total: 0, totalPages: 1 };
+    const vs       = state.venueStates[type] || { open: false, page: 1, items: [], total: 0, totalPages: 1 };
     const listHtml = vs.open ? buildVenueListHtml(type, vs) : '';
     return `
       <div class="venue-group" data-venue-type="${esc(type)}">
@@ -302,6 +392,28 @@ function renderVenuesSection() {
     </div>`;
 
   document.getElementById('venues-container').addEventListener('click', handleVenueClick);
+
+  // Auto-highlight target venue after navigation
+  if (state.highlightVenueId && state.highlightVenueType) {
+    const targetType = state.highlightVenueType;
+    const targetId   = state.highlightVenueId;
+    state.highlightVenueId   = null;
+    state.highlightVenueType = null;
+
+    const vs = state.venueStates[targetType] || { open: false, page: 1, items: [], total: 0 };
+    vs.open = true;
+    state.venueStates[targetType] = vs;
+    renderVenuesSection();
+    fetchVenuePage(state.selectedUnit, targetType, 1).then(() => {
+      const vs2 = state.venueStates[targetType];
+      if (vs2 && vs2.items.length > 0) {
+        state.expandedVenueId = targetId;
+        renderVenuesSection();
+        document.querySelector(`[data-venue-id="${targetId}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
 }
 
 function buildVenueListHtml(type, vs) {
@@ -317,10 +429,17 @@ function buildVenueListHtml(type, vs) {
            data-action="toggle-venue" data-venue-id="${v.id}">
         <span class="venue-item__toggle">${isExpanded ? '▼' : '▶'}</span>
         <span class="venue-item__name">${esc(v.name)}</span>
+        ${isExpanded ? `
+          <button class="icon-btn" data-action="open-venue-members"
+                  data-venue-id="${v.id}" data-venue-name="${esc(v.name)}"
+                  title="View full member list">
+            <img src="/static/images/to_venue_logo.svg" alt="Members">
+          </button>` : ''}
       </div>
       ${expandHtml}`;
   }).join('');
 
+  const showing = vs.items.length + (vs.page - 1) * 50;
   const paginationHtml = vs.total > vs.per_page * vs.page || vs.page > 1
     ? buildVenuePaginationHtml(type, vs)
     : '';
@@ -365,17 +484,26 @@ function buildVenuePaginationHtml(type, vs) {
 }
 
 async function handleVenueClick(e) {
-  const toggleGroup = e.target.closest('[data-action="toggle-venue-group"]');
-  const toggleVenue = e.target.closest('[data-action="toggle-venue"]');
-  const venuePrev   = e.target.closest('[data-action="venue-prev"]');
-  const venueNext   = e.target.closest('[data-action="venue-next"]');
+  const openMembers  = e.target.closest('[data-action="open-venue-members"]');
+  const toggleGroup  = e.target.closest('[data-action="toggle-venue-group"]');
+  const toggleVenue  = e.target.closest('[data-action="toggle-venue"]');
+  const venuePrev    = e.target.closest('[data-action="venue-prev"]');
+  const venueNext    = e.target.closest('[data-action="venue-next"]');
+
+  if (openMembers) {
+    e.stopPropagation();
+    await openVenueMembersPanel(
+      Number(openMembers.dataset.venueId),
+      openMembers.dataset.venueName
+    );
+    return;
+  }
 
   if (toggleGroup) {
     const type = toggleGroup.dataset.type;
     const vs = state.venueStates[type] || { open: false, page: 1, items: [], total: 0 };
     vs.open = !vs.open;
     state.venueStates[type] = vs;
-
     if (vs.open && vs.items.length === 0) {
       renderVenuesSection();
       await fetchVenuePage(state.selectedUnit, type, 1);
@@ -410,7 +538,7 @@ async function handleVenueClick(e) {
 async function fetchVenuePage(unitName, type, page) {
   const vs = state.venueStates[type] || { open: true, page: 1, items: [], total: 0 };
   state.venueStates[type] = vs;
-  renderVenuesSection(); // show loading state
+  renderVenuesSection();
 
   try {
     const data = await fetchJson(
@@ -447,7 +575,7 @@ function renderPeopleSectionShell(unit) {
 async function loadPeople(unitName, page) {
   state.expandedPersonId = null;
 
-  const tableWrap = document.getElementById('people-table-wrap');
+  const tableWrap    = document.getElementById('people-table-wrap');
   const paginationEl = document.getElementById('people-pagination');
   if (!tableWrap) return;
 
@@ -473,6 +601,22 @@ async function loadPeople(unitName, page) {
     return;
   }
 
+  // Check if we need to scroll-to a highlighted person
+  if (state.highlightPersonId) {
+    const targetId = state.highlightPersonId;
+    const found    = data.people.find(p => p.id === targetId);
+    if (found) {
+      state.expandedPersonId  = targetId;
+      state.highlightPersonId = null;
+    } else if (data.page < data.total_pages) {
+      // Person not on this page — try next page
+      await loadPeople(unitName, page + 1);
+      return;
+    } else {
+      state.highlightPersonId = null;
+    }
+  }
+
   tableWrap.innerHTML = `
     <table class="people-table">
       <thead>
@@ -484,11 +628,17 @@ async function loadPeople(unitName, page) {
     </table>`;
 
   if (paginationEl) paginationEl.innerHTML = renderPeoplePagination(data);
+
+  // Scroll to highlighted person if found
+  if (state.expandedPersonId) {
+    const row = tableWrap.querySelector(`[data-person-id="${state.expandedPersonId}"]`);
+    row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 function renderPeopleRows(people) {
   return people.map(p => {
-    const isExpanded   = state.expandedPersonId === p.id;
+    const isExpanded    = state.expandedPersonId === p.id;
     const activitiesStr = (p.activities || []).join(', ') || '—';
     const expandRow     = isExpanded ? buildPersonExpandHtml(p) : '';
 
@@ -506,25 +656,12 @@ function renderPeopleRows(people) {
 }
 
 function buildPersonExpandHtml(person) {
-  const activities = person.activities || [];
-  const tagsHtml = activities.length > 0
-    ? activities.map(a => `<span class="activity-tag">${esc(a)}</span>`).join('')
-    : '<span style="color:var(--theme-text-muted)">none</span>';
-
   return `
     <tr class="person-expand-row">
       <td colspan="5">
         <div class="person-expand-content">
-          <div>
-            <strong>Age</strong>${person.age}
-          </div>
-          <div>
-            <strong>Sex</strong>${esc(person.sex)}
-          </div>
-          <div>
-            <strong>Activities</strong>
-            <div class="activities-list">${tagsHtml}</div>
-          </div>
+          <div><strong>Age</strong>${person.age}</div>
+          <div><strong>Sex</strong>${esc(person.sex)}</div>
           <div>
             <button class="btn-details"
                     data-action="open-person" data-person-id="${person.id}">
@@ -575,10 +712,18 @@ function bindPeopleEvents() {
   });
 }
 
+// ── side panel ────────────────────────────────────────────────────────────────
+
+function closeSidePanel() {
+  document.getElementById('person-panel').classList.remove('open');
+}
+
 // ── person panel ──────────────────────────────────────────────────────────────
 
-async function openPersonPanel(personId) {
-  const panel = document.getElementById('person-panel');
+async function openPersonPanel(personId, { pushHistory = true } = {}) {
+  if (pushHistory) pushPanelHistory({ type: 'person', id: personId });
+
+  const panel   = document.getElementById('person-panel');
   const content = document.getElementById('person-panel-content');
   document.getElementById('person-panel-title').textContent = `Person ${personId}`;
   content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading…</div>';
@@ -593,6 +738,13 @@ async function openPersonPanel(personId) {
   }
 
   content.innerHTML = buildPersonPanelHtml(person);
+
+  // Bind "View full details" button
+  content.querySelector('[data-action="load-full-details"]')
+    ?.addEventListener('click', () => loadPersonFullDetails(personId, content));
+
+  // Bind venue icon buttons in any pre-rendered activity map items
+  content.addEventListener('click', handlePanelClick);
 }
 
 function buildPersonPanelHtml(person) {
@@ -619,43 +771,10 @@ function buildPersonPanelHtml(person) {
         </div>` : ''}
     </div>`;
 
-  // Activities list
-  const activities = person.activities || [];
-  if (activities.length > 0) {
-    html += `
-      <div class="detail-section-title">Activities</div>
-      <div class="activities-list" style="margin-bottom:0.75rem">
-        ${activities.map(a => `<span class="activity-tag">${esc(a)}</span>`).join('')}
-      </div>`;
-  }
-
-  // Activity map
-  const actMap = person.activity_map || {};
-  const actEntries = Object.entries(actMap);
-  if (actEntries.length > 0) {
-    html += `<div class="detail-section-title">Activity Map</div>`;
-    for (const [actType, venuesByType] of actEntries) {
-      for (const [venueType, subsets] of Object.entries(venuesByType || {})) {
-        if (!subsets || subsets.length === 0) continue;
-        for (const s of subsets) {
-          html += `
-            <div class="activity-map-item">
-              <div class="activity-map-type">${esc(actType)}</div>
-              <div class="activity-map-venue">
-                ${esc(venueType)} — <span>${esc(s.venue_name || '—')}</span>
-                (subset: ${esc(s.subset_name || '—')})
-              </div>
-            </div>`;
-        }
-      }
-    }
-  }
-
   // Properties
   const props = Object.entries(person.properties || {}).filter(([, v]) => v !== null);
   if (props.length > 0) {
-    html += `<div class="detail-section-title">Properties</div>
-      <div class="detail-grid">`;
+    html += `<div class="detail-section-title">Properties</div><div class="detail-grid">`;
     for (const [k, v] of props) {
       html += `
         <div class="detail-item">
@@ -666,9 +785,197 @@ function buildPersonPanelHtml(person) {
     html += '</div>';
   }
 
+  html += `
+    <div class="detail-section-title">Activities</div>
+    <div id="person-activities-full">
+      <button class="btn-details" data-action="load-full-details">Load activities →</button>
+    </div>`;
+
   return html;
 }
 
-function closePersonPanel() {
-  document.getElementById('person-panel').classList.remove('open');
+async function loadPersonFullDetails(personId, container) {
+  const actContainer = container.querySelector('#person-activities-full');
+  if (!actContainer) return;
+  actContainer.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading from file…</div>';
+
+  let data;
+  try {
+    data = await fetchJson(`/api/explorer/person/${personId}/full`);
+  } catch (err) {
+    actContainer.innerHTML = `<div style="color:var(--theme-text-muted)">Error: ${esc(err.message)}</div>`;
+    return;
+  }
+
+  actContainer.innerHTML = buildActivitiesHtml(data.activities);
+}
+
+function buildActivitiesHtml(activities) {
+  if (!activities || activities.length === 0) {
+    return '<div style="color:var(--theme-text-muted);font-size:0.82rem;padding:0.5rem 0">No activities found.</div>';
+  }
+
+  return activities.map(a => `
+    <div class="activity-map-item">
+      <div class="activity-map-header">
+        <span class="activity-map-type">${esc(a.activity_name)}</span>
+        <button class="icon-btn"
+                data-action="open-venue-members"
+                data-venue-id="${a.venue_id}"
+                data-venue-name="${esc(a.venue_name)}"
+                data-venue-type="${esc(a.venue_type)}"
+                data-venue-geo-unit="${esc(a.venue_geo_unit)}"
+                title="View venue members / go to venue">
+          <img src="/static/images/to_venue_logo.svg" alt="Go to venue">
+        </button>
+      </div>
+      <div class="activity-map-venue">
+        <span class="venue-type-tag">${esc(a.venue_type)}</span>
+        <span class="venue-name">${esc(a.venue_name)}</span>
+        <span class="subset-tag">${esc(a.subset_name)}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ── venue members panel ────────────────────────────────────────────────────────
+
+async function openVenueMembersPanel(venueId, venueName, { pushHistory = true } = {}) {
+  if (pushHistory) pushPanelHistory({ type: 'venue_members', id: venueId, name: venueName });
+
+  const panel   = document.getElementById('person-panel');
+  const content = document.getElementById('person-panel-content');
+  document.getElementById('person-panel-title').textContent = `Members: ${venueName || venueId}`;
+  content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading from file…</div>';
+  panel.classList.add('open');
+
+  let data;
+  try {
+    data = await fetchJson(`/api/explorer/venue/${venueId}/members`);
+  } catch (err) {
+    content.innerHTML = `<div style="color:var(--theme-text-muted);font-size:0.82rem">Error: ${esc(err.message)}</div>`;
+    return;
+  }
+
+  document.getElementById('person-panel-title').textContent = `Members: ${data.venue_name || venueName}`;
+  content.innerHTML = buildVenueMembersHtml(data);
+  content.addEventListener('click', handleVenueMembersClick);
+}
+
+function buildVenueMembersHtml(data) {
+  if (!data.subsets || data.subsets.length === 0) {
+    return '<div style="color:var(--theme-text-muted);font-size:0.82rem">No member data.</div>';
+  }
+
+  return data.subsets.map(subset => {
+    const membersHtml = subset.members.map(m => `
+      <div class="member-row">
+        <span class="member-id">${m.id}</span>
+        <span class="member-age">${m.age}</span>
+        <span class="member-sex">${esc(m.sex)}</span>
+        <span class="member-unit">${esc(m.geo_unit)}</span>
+        <button class="icon-btn"
+                data-action="go-to-person"
+                data-person-id="${m.id}"
+                data-geo-unit="${esc(m.geo_unit)}"
+                title="Go to person in main window">
+          <img src="/static/images/to_person_logo.svg" alt="Go to person">
+        </button>
+      </div>`).join('');
+
+    const hasPagination = subset.total_pages > 1;
+    const paginationHtml = hasPagination ? `
+      <div class="member-pagination">
+        ${subset.page > 1
+          ? `<button class="nav-btn" data-action="member-prev"
+                    data-subset="${esc(subset.name)}"
+                    data-venue-id="${data.venue_id}">← Prev</button>`
+          : ''}
+        <span class="page-info">Page ${subset.page}/${subset.total_pages}</span>
+        ${subset.page < subset.total_pages
+          ? `<button class="nav-btn" data-action="member-next"
+                    data-subset="${esc(subset.name)}"
+                    data-venue-id="${data.venue_id}">Next →</button>`
+          : ''}
+      </div>` : '';
+
+    return `
+      <details class="subset-group" open>
+        <summary class="subset-group__title">
+          ${esc(subset.name)}
+          <span class="subset-count">${fmt(subset.total)}</span>
+        </summary>
+        <div class="member-list">
+          <div class="member-list__header">
+            <span>ID</span><span>Age</span><span>Sex</span><span>Unit</span><span></span>
+          </div>
+          ${membersHtml || '<div style="padding:0.5rem;color:var(--theme-text-muted)">No members on this page.</div>'}
+        </div>
+        ${paginationHtml}
+      </details>`;
+  }).join('');
+}
+
+async function handleVenueMembersClick(e) {
+  const gotoBtn  = e.target.closest('[data-action="go-to-person"]');
+  const prevBtn  = e.target.closest('[data-action="member-prev"]');
+  const nextBtn  = e.target.closest('[data-action="member-next"]');
+
+  if (gotoBtn) {
+    e.stopPropagation();
+    const personId   = Number(gotoBtn.dataset.personId);
+    const geoUnitName = gotoBtn.dataset.geoUnit;
+    await goToPerson(personId, geoUnitName);
+    return;
+  }
+
+  if (prevBtn || nextBtn) {
+    const btn       = prevBtn || nextBtn;
+    const subsetName = btn.dataset.subset;
+    const venueId   = Number(btn.dataset.venueId);
+    const content   = document.getElementById('person-panel-content');
+    const titleEl   = document.getElementById('person-panel-title');
+    const venueName = titleEl.textContent.replace(/^Members:\s*/, '');
+
+    const details    = btn.closest('details');
+    const currentPage = Number(details.querySelector('.page-info')?.textContent.match(/Page (\d+)/)?.[1] || 1);
+    const newPage    = prevBtn ? currentPage - 1 : currentPage + 1;
+
+    content.innerHTML = '<div style="color:var(--theme-text-muted);font-size:0.82rem">Loading…</div>';
+    let data;
+    try {
+      data = await fetchJson(`/api/explorer/venue/${venueId}/members?subset=${encodeURIComponent(subsetName)}&page=${newPage}`);
+    } catch (err) {
+      content.innerHTML = `<div style="color:var(--theme-text-muted)">Error: ${esc(err.message)}</div>`;
+      return;
+    }
+    content.innerHTML = buildVenueMembersHtml(data);
+    content.addEventListener('click', handleVenueMembersClick);
+    return;
+  }
+}
+
+// ── panel click dispatcher ────────────────────────────────────────────────────
+
+async function handlePanelClick(e) {
+  const venueBtn = e.target.closest('[data-action="open-venue-members"]');
+  if (venueBtn) {
+    e.stopPropagation();
+    await openVenueMembersPanel(
+      Number(venueBtn.dataset.venueId),
+      venueBtn.dataset.venueName
+    );
+  }
+}
+
+// ── cross-navigation ──────────────────────────────────────────────────────────
+
+async function goToPerson(personId, geoUnitName) {
+  state.highlightPersonId = personId;
+  await loadUnit(geoUnitName);
+}
+
+async function goToVenue(venueId, venueType, geoUnitName) {
+  state.highlightVenueId   = venueId;
+  state.highlightVenueType = venueType;
+  await loadUnit(geoUnitName);
 }

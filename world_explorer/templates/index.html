@@ -31,6 +31,10 @@
           <span>Select a geographic unit from the tree</span>
         </div>
         <div id="unit-detail" hidden>
+          <div id="detail-nav-row">
+            <button id="nav-back-btn" class="nav-btn" title="Back" disabled>&#8592;</button>
+            <button id="nav-fwd-btn"  class="nav-btn" title="Forward" disabled>&#8594;</button>
+          </div>
           <div id="unit-title-row"></div>
           <div id="stats-strip-container"></div>
           <div id="distributions-container"></div>
@@ -41,8 +45,10 @@
 
       <div id="person-panel">
         <div class="person-panel__header">
-          <span class="person-panel__title" id="person-panel-title">Person Detail</span>
-          <button class="btn-close" id="close-person-panel" title="Close">✕</button>
+          <button id="panel-back-btn" class="nav-btn" title="Back" disabled>&#8592;</button>
+          <button id="panel-fwd-btn"  class="nav-btn" title="Forward" disabled>&#8594;</button>
+          <span class="person-panel__title" id="person-panel-title">Detail</span>
+          <button class="btn-close" id="close-person-panel" title="Close">&#10005;</button>
         </div>
         <div class="person-panel__body" id="person-panel-content"></div>
       </div>

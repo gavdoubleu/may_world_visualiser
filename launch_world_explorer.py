@@ -47,7 +47,7 @@ Examples:
         print(f'\nERROR: failed to load world: {exc}\n')
         sys.exit(1)
 
-    app = create_app(world)
+    app = create_app(world, world_path)
 
     print(f'\n{"=" * 50}')
     print('  WorldExplorer')

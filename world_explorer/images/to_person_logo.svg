@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="38.990791mm"
+   height="43.225067mm"
+   viewBox="0 0 38.990791 43.225067"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+     id="defs1"><clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath7"><rect
+         style="fill:none;stroke:#000000;stroke-width:2.70801;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
+         id="rect8"
+         width="51.334915"
+         height="46.982327"
+         x="22.915087"
+         y="67.593102" /></clipPath><clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath8"><rect
+         style="fill:none;stroke:#000000;stroke-width:2.70801;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
+         id="rect9"
+         width="51.334915"
+         height="46.982327"
+         x="22.915087"
+         y="67.593102"
+         transform="scale(1,-1)" /></clipPath><clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath9"><rect
+         style="fill:none;stroke:#000000;stroke-width:2.70801;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
+         id="rect10"
+         width="51.334915"
+         height="46.982327"
+         x="22.915087"
+         y="67.593102" /></clipPath></defs><g
+     id="layer1"
+     transform="translate(-30.691656,-71.350365)"><circle
+       style="fill:none;stroke:#000000;stroke-width:1.048;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
+       id="path4"
+       cx="54.313118"
+       cy="80.745499"
+       r="8.8711414"
+       clip-path="url(#clipPath9)" /><path
+       style="fill:none;stroke:#000000;stroke-width:1.09757;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
+       id="path5"
+       d="M 69.133662,-115.66244 A 14.36822,22.581467 0 0 1 54.83075,-93.081204 14.36822,22.581467 0 0 1 40.397815,-115.45716 l 14.367627,-0.20528 z"
+       transform="scale(1,-1)"
+       clip-path="url(#clipPath8)" /><path
+       style="fill:none;stroke:#000000;stroke-width:1.02;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
+       d="m 29.084987,79.460252 9.004452,12.835269 -8.997858,12.835259"
+       id="path6"
+       clip-path="url(#clipPath7)"
+       transform="translate(2.1166667)" /></g></svg>
