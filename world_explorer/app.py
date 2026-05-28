@@ -22,15 +22,22 @@ def create_app(world, hdf5_path):
             venue_index[venue.id] = venue
 
     # Build lookup structures from HDF5 (cheap reads only, done once at startup)
-    app.config['HDF5_PATH'] = str(hdf5_path)
     with h5py.File(str(hdf5_path), 'r') as f:
-        person_ids = f['population/ids'][:]                      # ~19 MB
+        person_ids = f['population/ids'][:]
         person_id_to_idx = np.empty_like(person_ids)
         person_id_to_idx[person_ids] = np.arange(len(person_ids), dtype=person_ids.dtype)
-        app.config['PERSON_ID_TO_IDX'] = person_id_to_idx       # inverse permutation
 
-        subset_venue_ids = f['venues/subsets/venue_ids'][:]      # ~11 MB sorted array
-        app.config['SUBSET_VENUE_IDS'] = subset_venue_ids
+        subset_venue_ids = f['venues/subsets/venue_ids'][:]
+
+    from world_explorer.explorer_loader import ExplorerLoader
+    from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
+
+    explorer_loader = ExplorerLoader(hdf5_path, person_id_to_idx, subset_venue_ids, world.geography)
+    app.config[_EXPLORER_CTX_KEY] = ExplorerContext(
+        world=world,
+        venue_index=venue_index,
+        explorer_loader=explorer_loader,
+    )
 
     from world_map.context import AppContext, _CTX_KEY
     from world_map.config import AppConfig
