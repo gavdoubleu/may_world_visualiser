@@ -47,12 +47,10 @@ html, body { height: 100%; overflow: hidden; }
 
 .header-brand { display: flex; align-items: center; gap: 0.6rem; }
 
-.header-title {
-  font-family: var(--font-display, 'ShareTechMono'), monospace;
-  color: var(--theme-header-text);
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+.header-logo {
+  height: 36px;
+  width: auto;
+  display: block;
 }
 
 .header-stats {
