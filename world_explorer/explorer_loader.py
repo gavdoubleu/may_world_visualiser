@@ -12,7 +12,10 @@ class ExplorerLoader:
     def __init__(self, hdf5_path, person_id_to_idx, subset_venue_ids, geography,
                  subtree_index=None, person_geo_unit_ids=None, venue_geo_unit_ids=None,
                  venue_types_arr=None, venue_type_names=None,
-                 venue_list_position=None, person_list_position=None):
+                 venue_list_position=None, person_list_position=None,
+                 venue_parent_ids=None, venue_child_counts=None,
+                 venue_child_total_members=None,
+                 children_by_parent_sorted=None, children_parent_ids_sorted=None):
         self._hdf5_path = str(hdf5_path)
         self._person_id_to_idx    = person_id_to_idx
         self._subset_venue_ids    = subset_venue_ids
@@ -24,6 +27,11 @@ class ExplorerLoader:
         self._venue_type_names_cache = venue_type_names or []
         self._venue_list_position = venue_list_position
         self._person_list_position = person_list_position
+        self._venue_parent_ids           = venue_parent_ids
+        self._venue_child_counts         = venue_child_counts
+        self._venue_child_total_members  = venue_child_total_members
+        self._children_by_parent_sorted  = children_by_parent_sorted
+        self._children_parent_ids_sorted = children_parent_ids_sorted
 
     def load_person_activities(self, person_id: int) -> list[dict] | None:
         """Return ActivityMap records for person_id, or None if not found."""
@@ -262,6 +270,11 @@ class ExplorerLoader:
                      for t in row_types]) == type_filter
                 rows = rows[keep]
 
+            # exclude ChildVenues from top-level list
+            if self._venue_parent_ids is not None and len(rows):
+                top_level_mask = self._venue_parent_ids[rows] == -1
+                rows = rows[top_level_mask]
+
             total = int(len(rows))
             page_rows = rows[(page - 1) * per_page: page * per_page]
 
@@ -275,6 +288,11 @@ class ExplorerLoader:
                 geo_ids    = f['venues/geo_unit_ids'][idx]
                 for venue_id, name_b, type_code, lat, lon, geo_id in zip(
                         idx, names, types, lats, lons, geo_ids):
+                    child_count = (int(self._venue_child_counts[venue_id])
+                                   if self._venue_child_counts is not None else 0)
+                    total_child_members = (int(self._venue_child_total_members[venue_id])
+                                           if self._venue_child_total_members is not None
+                                           else 0)
                     venues.append({
                         'id': int(venue_id),
                         'name': self._decode(name_b),
@@ -285,6 +303,8 @@ class ExplorerLoader:
                         'properties': {},
                         'geo_unit': self._unit_name(int(geo_id)),
                         'subsets': self._venue_subsets(f, int(venue_id)),
+                        'child_count': child_count,
+                        'total_child_members': total_child_members,
                     })
 
         return {
@@ -313,6 +333,58 @@ class ExplorerLoader:
                 'properties': {},
                 'subsets': self._venue_subsets(f, venue_id),
             }
+
+    def load_venue_children(self, venue_id: int, page: int, per_page: int) -> dict:
+        """Return paginated ChildVenues for a ParentVenue."""
+        empty = {'parent_id': venue_id, 'total_count': 0, 'page': page,
+                 'per_page': per_page, 'total_pages': 0, 'venues': []}
+
+        if (self._children_by_parent_sorted is None
+                or self._children_parent_ids_sorted is None):
+            return empty
+
+        first = int(np.searchsorted(self._children_parent_ids_sorted, venue_id, side='left'))
+        last  = int(np.searchsorted(self._children_parent_ids_sorted, venue_id, side='right'))
+        if first >= last:
+            return empty
+
+        all_child_rows = self._children_by_parent_sorted[first:last]
+        total = int(len(all_child_rows))
+        page_rows = all_child_rows[(page - 1) * per_page: page * per_page]
+
+        venues = []
+        if len(page_rows):
+            with h5py.File(self._hdf5_path, 'r') as f:
+                type_names = self._venue_type_names(f)
+                idx     = sorted(page_rows.tolist())
+                names   = f['metadata/names/venues'][idx]
+                types   = f['venues/types'][idx]
+                lats    = f['venues/latitudes'][idx]
+                lons    = f['venues/longitudes'][idx]
+                geo_ids = f['venues/geo_unit_ids'][idx]
+                for venue_row, name_b, type_code, lat, lon, geo_id in zip(
+                        idx, names, types, lats, lons, geo_ids):
+                    venues.append({
+                        'id': int(venue_row),
+                        'name': self._decode(name_b),
+                        'type': (type_names[int(type_code)]
+                                 if int(type_code) < len(type_names) else 'unknown'),
+                        'coordinates': (None if np.isnan(lat) else [float(lat), float(lon)]),
+                        'properties': {},
+                        'geo_unit': self._unit_name(int(geo_id)),
+                        'subsets': self._venue_subsets(f, int(venue_row)),
+                        'child_count': 0,
+                        'total_child_members': 0,
+                    })
+
+        return {
+            'parent_id':   venue_id,
+            'total_count': total,
+            'page':        page,
+            'per_page':    per_page,
+            'total_pages': calc_total_pages(total, per_page),
+            'venues':      venues,
+        }
 
     # ── locate (O(1) page lookup from startup position arrays) ───────────────────
 

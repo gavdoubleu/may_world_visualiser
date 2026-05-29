@@ -63,7 +63,10 @@ class ExplorerWorld:
     def __init__(self, geography, slim_statistics, unit_statistics,
                  person_id_to_idx, subset_venue_ids, subtree_index,
                  person_geo_unit_ids, venue_geo_unit_ids, venue_types_arr,
-                 venue_type_names, venue_list_position, person_list_position):
+                 venue_type_names, venue_list_position, person_list_position,
+                 venue_parent_ids=None, venue_child_counts=None,
+                 venue_child_total_members=None,
+                 children_by_parent_sorted=None, children_parent_ids_sorted=None):
         self.geography = geography
         self._slim_statistics = slim_statistics
         self._unit_statistics = unit_statistics
@@ -76,6 +79,11 @@ class ExplorerWorld:
         self.venue_type_names     = venue_type_names
         self.venue_list_position  = venue_list_position
         self.person_list_position = person_list_position
+        self.venue_parent_ids             = venue_parent_ids
+        self.venue_child_counts           = venue_child_counts
+        self.venue_child_total_members    = venue_child_total_members
+        self.children_by_parent_sorted    = children_by_parent_sorted
+        self.children_parent_ids_sorted   = children_parent_ids_sorted
         self.population = None
         self.venues = None
 
@@ -173,11 +181,12 @@ def _build_subtree_index(f, geography):
 
 def _build_locate_indices(subtree_index, geography,
                           venue_geo_unit_ids, venue_types_arr,
-                          person_geo_unit_ids):
+                          person_geo_unit_ids, venue_parent_ids=None):
     """Build O(1) position lookup arrays for venue and person locate endpoints.
 
     venue_list_position[venue_id]   = rank of venue within its direct geo unit's
-                                      subtree listing, filtered by type.
+                                      subtree listing, filtered by type, excluding
+                                      ChildVenues (parent_id != -1).
     person_list_position[array_idx] = rank of person within their direct geo unit's
                                       subtree person listing.
 
@@ -190,19 +199,28 @@ def _build_locate_indices(subtree_index, geography,
     venue_list_position  = np.zeros(num_venues,  dtype=np.int32)
     person_list_position = np.zeros(num_persons, dtype=np.int32)
 
+    # mask identifying venues that are NOT children (these appear in the top-level list)
+    if venue_parent_ids is not None and len(venue_parent_ids) == num_venues:
+        is_top_level = venue_parent_ids == -1
+    else:
+        is_top_level = np.ones(num_venues, dtype=bool)
+
     for unit_id in geography.units_by_id:
         # ── venue positions ───────────────────────────────────────────────────
         v_rows = np.sort(subtree_index.venue_rows(unit_id))
         if len(v_rows):
-            direct_mask = venue_geo_unit_ids[v_rows] == unit_id
+            # exclude child venues from position ranking
+            top_level_mask = is_top_level[v_rows]
+            v_rows_top     = v_rows[top_level_mask]
+            direct_mask    = venue_geo_unit_ids[v_rows_top] == unit_id
             if np.any(direct_mask):
-                v_types = venue_types_arr[v_rows]
+                v_types = venue_types_arr[v_rows_top]
                 for type_code in np.unique(v_types[direct_mask]):
-                    same_type_mask     = (v_types == type_code)
-                    same_type_rows     = v_rows[same_type_mask]   # sorted, whole subtree
-                    direct_of_type     = direct_mask & same_type_mask
-                    direct_venue_ids   = v_rows[direct_of_type]
-                    positions          = np.searchsorted(same_type_rows, direct_venue_ids)
+                    same_type_mask   = (v_types == type_code)
+                    same_type_rows   = v_rows_top[same_type_mask]
+                    direct_of_type   = direct_mask & same_type_mask
+                    direct_venue_ids = v_rows_top[direct_of_type]
+                    positions        = np.searchsorted(same_type_rows, direct_venue_ids)
                     venue_list_position[direct_venue_ids] = positions
 
         # ── person positions ──────────────────────────────────────────────────
@@ -402,9 +420,40 @@ def load_explorer_world(input_file):
             venue_type_names = [n.decode() if isinstance(n, bytes) else str(n)
                                 for n in f['metadata/registries/venue_types'][:]]
 
+        num_venues = len(venue_types_arr)
+        raw_parent_ids = (f['venues/parent_ids'][:]
+                          if 'venues/parent_ids' in f
+                          else np.full(num_venues, -1, dtype=np.int32))
+        venue_parent_ids = raw_parent_ids.astype(np.int64)
+
+        # child venue index (mirrors subset_venue_ids binary-search pattern)
+        child_mask               = venue_parent_ids != -1
+        child_venue_ids          = np.where(child_mask)[0].astype(np.int64)
+        child_parent_ids         = venue_parent_ids[child_mask]
+        sort_idx                 = np.argsort(child_parent_ids, kind='stable')
+        children_by_parent_sorted  = child_venue_ids[sort_idx]
+        children_parent_ids_sorted = child_parent_ids[sort_idx]
+
+        venue_child_counts = np.zeros(num_venues, dtype=np.int32)
+        if len(child_parent_ids):
+            np.add.at(venue_child_counts, child_parent_ids, 1)
+
+        # per-venue member total from subset member_counts
+        venue_total_members = np.zeros(num_venues, dtype=np.int32)
+        if 'venues/subsets/member_counts' in f and 'venues/subsets/venue_ids' in f:
+            mc  = f['venues/subsets/member_counts'][:]
+            svi = f['venues/subsets/venue_ids'][:]
+            np.add.at(venue_total_members, svi, mc)
+
+        venue_child_total_members = np.zeros(num_venues, dtype=np.int32)
+        if len(child_venue_ids):
+            np.add.at(venue_child_total_members, child_parent_ids,
+                      venue_total_members[child_venue_ids])
+
     venue_list_position, person_list_position = _build_locate_indices(
         subtree_index, geography,
         venue_geo_unit_ids, venue_types_arr, person_geo_unit_ids,
+        venue_parent_ids=venue_parent_ids,
     )
 
     world = ExplorerWorld(
@@ -412,6 +461,11 @@ def load_explorer_world(input_file):
         person_id_to_idx, subset_venue_ids, subtree_index,
         person_geo_unit_ids, venue_geo_unit_ids, venue_types_arr,
         venue_type_names, venue_list_position, person_list_position,
+        venue_parent_ids=venue_parent_ids,
+        venue_child_counts=venue_child_counts,
+        venue_child_total_members=venue_child_total_members,
+        children_by_parent_sorted=children_by_parent_sorted,
+        children_parent_ids_sorted=children_parent_ids_sorted,
     )
     logger.info("Explorer world loaded in %.2fs: %s",
                 time.perf_counter() - t_start, world)

@@ -432,6 +432,59 @@ html, body { height: 100%; overflow: hidden; }
   border-top: 1px solid var(--theme-border);
 }
 
+/* ── parent venue / child venue ─────────────────────────────────────────────── */
+
+.venue-child-count {
+  font-size: 0.7rem;
+  color: var(--theme-text-muted);
+  font-family: var(--font-display, monospace), monospace;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.venue-parent-expand {
+  padding-left: 2.2rem;
+}
+
+.venue-children {
+  border-left: 2px solid var(--theme-border);
+  margin-bottom: 0.3rem;
+}
+
+.venue-children-loading {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.76rem;
+  color: var(--theme-text-muted);
+}
+
+.venue-child-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background 0.1s;
+}
+.venue-child-item:hover { background: var(--theme-button-hover-bg); }
+.venue-child-item.expanded { background: var(--theme-button-active-bg); color: var(--theme-accent); }
+
+.venue-child-subsets {
+  padding: 0.35rem 0.75rem 0.35rem 1.6rem;
+  background: var(--theme-surface);
+  border-bottom: 1px solid var(--theme-border);
+  font-size: 0.74rem;
+  color: var(--theme-text-muted);
+  line-height: 1.6;
+}
+.venue-child-subsets strong { color: var(--theme-text); }
+
+.venue-children-pagination {
+  padding-left: 0.75rem;
+  border-top: 1px solid var(--theme-border);
+  margin-top: 0.1rem;
+}
+
 /* ── people table ───────────────────────────────────────────────────────────── */
 
 .people-table {

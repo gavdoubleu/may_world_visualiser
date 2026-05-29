@@ -179,6 +179,14 @@ def locate_person(person_id):
     return jsonify(result)
 
 
+@explorer_bp.route('/api/explorer/venue/<int:venue_id>/children')
+def get_venue_children(venue_id):
+    loader   = get_explorer_context().explorer_loader
+    per_page = min(request.args.get('per_page', 20, type=int), 200)
+    page     = max(1, request.args.get('page', 1, type=int))
+    return jsonify(loader.load_venue_children(venue_id, page, per_page))
+
+
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/members')
 def get_venue_members(venue_id):
     loader   = get_explorer_context().explorer_loader

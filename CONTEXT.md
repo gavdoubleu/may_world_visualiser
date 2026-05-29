@@ -14,7 +14,7 @@ A geographical unit loaded from the HDF5 world file. GeoUnits form a strict hier
 An individual resident assigned to exactly one GeoUnit. Carries slim attributes: id, age, sex, and a list of activity type strings. Full detail (activity_map) is available via a separate API call.
 
 **Venue**
-A location assigned to a GeoUnit, of a named VenueType. Contains zero or more Subsets.
+A location assigned to a GeoUnit, of a named VenueType. Contains zero or more Subsets. A Venue whose `parent_id == -1` and that has at least one ChildVenue is a **ParentVenue**; it appears at the top level of the venue list and shows a child count and amalgamated member total. A Venue whose `parent_id != -1` is a **ChildVenue**; it never appears at the top level and is accessible only by expanding its ParentVenue. The hierarchy is two levels deep: ChildVenues do not themselves have children.
 
 **Subset**
 A named membership group within a Venue (e.g. a household within a building). In the Venue list, only a member count is shown. Full member detail (id, age, sex, geo_unit) is loaded on demand when a Venue is opened in the Detail Panel.
