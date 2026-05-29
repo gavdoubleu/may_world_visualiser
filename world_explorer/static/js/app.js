@@ -1,5 +1,7 @@
 'use strict';
 
+const PAGE_SIZE = 20;
+
 // ── state ─────────────────────────────────────────────────────────────────────
 
 const state = {
@@ -453,7 +455,7 @@ function buildVenueListHtml(type, vs) {
       ${expandHtml}`;
   }).join('');
 
-  const showing = vs.items.length + (vs.page - 1) * 50;
+  const showing = vs.items.length + (vs.page - 1) * PAGE_SIZE;
   const paginationHtml = vs.total > vs.per_page * vs.page || vs.page > 1
     ? buildVenuePaginationHtml(type, vs)
     : '';
@@ -495,7 +497,7 @@ function buildVenueExpandHtml(venue) {
 }
 
 function buildVenuePaginationHtml(type, vs) {
-  const showing = vs.items.length + (vs.page - 1) * 50;
+  const showing = vs.items.length + (vs.page - 1) * PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(vs.total / vs.per_page));
   return `
     <div class="venue-pagination">
@@ -572,7 +574,7 @@ async function fetchVenuePage(unitName, type, page) {
   try {
     const data = await fetchJson(
       `/api/explorer/unit/${encodeURIComponent(unitName)}/venues` +
-      `?type=${encodeURIComponent(type)}&page=${page}&per_page=50`
+      `?type=${encodeURIComponent(type)}&page=${page}&per_page=${PAGE_SIZE}`
     );
     vs.items      = data.venues;
     vs.total      = data.total_count;
@@ -620,7 +622,7 @@ async function loadPeople(unitName, page) {
   try {
     data = await fetchJson(
       `/api/explorer/unit/${encodeURIComponent(unitName)}/people` +
-      `?page=${page}&per_page=50`
+      `?page=${page}&per_page=${PAGE_SIZE}`
     );
   } catch (err) {
     tableWrap.innerHTML =
@@ -1102,7 +1104,7 @@ async function handlePanelClick(e) {
 async function goToPerson(personId) {
   let location;
   try {
-    location = await fetchJson(`/api/explorer/person/${personId}/locate?per_page=50`);
+    location = await fetchJson(`/api/explorer/person/${personId}/locate?per_page=${PAGE_SIZE}`);
   } catch (err) {
     console.error('Failed to locate person:', err);
     return;
@@ -1115,7 +1117,7 @@ async function goToPerson(personId) {
 async function goToVenue(venueId) {
   let location;
   try {
-    location = await fetchJson(`/api/explorer/venue/${venueId}/locate?per_page=50`);
+    location = await fetchJson(`/api/explorer/venue/${venueId}/locate?per_page=${PAGE_SIZE}`);
   } catch (err) {
     console.error('Failed to locate venue:', err);
     return;
