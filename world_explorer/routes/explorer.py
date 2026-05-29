@@ -161,6 +161,24 @@ def get_venue_detail(venue_id):
     return jsonify(venue)
 
 
+@explorer_bp.route('/api/explorer/venue/<int:venue_id>/locate')
+def locate_venue(venue_id):
+    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    result   = get_explorer_context().explorer_loader.locate_venue(venue_id, per_page)
+    if result is None or result['geo_unit'] is None:
+        return jsonify({'error': f'Venue {venue_id} not found'}), 404
+    return jsonify(result)
+
+
+@explorer_bp.route('/api/explorer/person/<int:person_id>/locate')
+def locate_person(person_id):
+    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    result   = get_explorer_context().explorer_loader.locate_person(person_id, per_page)
+    if result is None or result['geo_unit'] is None:
+        return jsonify({'error': f'Person {person_id} not found'}), 404
+    return jsonify(result)
+
+
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/members')
 def get_venue_members(venue_id):
     loader   = get_explorer_context().explorer_loader

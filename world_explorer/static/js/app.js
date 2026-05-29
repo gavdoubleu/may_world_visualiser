@@ -14,6 +14,8 @@ const state = {
   highlightPersonId: null,
   highlightVenueId:  null,
   highlightVenueType: null,
+  highlightVenuePage: null,
+  targetPeoplePage:   null,
 
   mainHistory:    [],   // [{unit}], max 10
   mainHistoryIdx: -1,
@@ -413,14 +415,16 @@ function renderVenuesSection() {
   if (state.highlightVenueId && state.highlightVenueType) {
     const targetType = state.highlightVenueType;
     const targetId   = state.highlightVenueId;
+    const targetPage = state.highlightVenuePage || 1;
     state.highlightVenueId   = null;
     state.highlightVenueType = null;
+    state.highlightVenuePage = null;
 
     const vs = state.venueStates[targetType] || { open: false, page: 1, items: [], total: 0 };
     vs.open = true;
     state.venueStates[targetType] = vs;
     renderVenuesSection();
-    fetchVenuePage(state.selectedUnit, targetType, 1).then(() => {
+    fetchVenuePage(state.selectedUnit, targetType, targetPage).then(() => {
       const vs2 = state.venueStates[targetType];
       if (vs2 && vs2.items.length > 0) {
         state.expandedVenueId = targetId;
@@ -600,6 +604,12 @@ function renderPeopleSectionShell(unit) {
 async function loadPeople(unitName, page) {
   state.expandedPersonId = null;
 
+  // Locate endpoint gives us the exact page; use it if available.
+  if (state.targetPeoplePage !== null) {
+    page = state.targetPeoplePage;
+    state.targetPeoplePage = null;
+  }
+
   const tableWrap    = document.getElementById('people-table-wrap');
   const paginationEl = document.getElementById('people-pagination');
   if (!tableWrap) return;
@@ -626,20 +636,12 @@ async function loadPeople(unitName, page) {
     return;
   }
 
-  // Check if we need to scroll-to a highlighted person
+  // Expand highlighted person (locate endpoint already put us on the right page)
   if (state.highlightPersonId) {
     const targetId = state.highlightPersonId;
     const found    = data.people.find(p => p.id === targetId);
-    if (found) {
-      state.expandedPersonId  = targetId;
-      state.highlightPersonId = null;
-    } else if (data.page < data.total_pages) {
-      // Person not on this page — try next page
-      await loadPeople(unitName, page + 1);
-      return;
-    } else {
-      state.highlightPersonId = null;
-    }
+    if (found) state.expandedPersonId = targetId;
+    state.highlightPersonId = null;
   }
 
   tableWrap.innerHTML = `
@@ -1038,9 +1040,8 @@ async function handleVenueMembersClick(e) {
 
   if (gotoBtn) {
     e.stopPropagation();
-    const personId   = Number(gotoBtn.dataset.personId);
-    const geoUnitName = gotoBtn.dataset.geoUnit;
-    await goToPerson(personId, geoUnitName);
+    const personId = Number(gotoBtn.dataset.personId);
+    await goToPerson(personId);
     return;
   }
 
@@ -1092,23 +1093,35 @@ async function handlePanelClick(e) {
   const gotoVenueBtn = e.target.closest('[data-action="go-to-venue"]');
   if (gotoVenueBtn) {
     e.stopPropagation();
-    await goToVenue(
-      Number(gotoVenueBtn.dataset.venueId),
-      gotoVenueBtn.dataset.venueType,
-      gotoVenueBtn.dataset.venueGeoUnit,
-    );
+    await goToVenue(Number(gotoVenueBtn.dataset.venueId));
   }
 }
 
 // ── cross-navigation ──────────────────────────────────────────────────────────
 
-async function goToPerson(personId, geoUnitName) {
+async function goToPerson(personId) {
+  let location;
+  try {
+    location = await fetchJson(`/api/explorer/person/${personId}/locate?per_page=50`);
+  } catch (err) {
+    console.error('Failed to locate person:', err);
+    return;
+  }
   state.highlightPersonId = personId;
-  await loadUnit(geoUnitName);
+  state.targetPeoplePage  = location.page;
+  await loadUnit(location.geo_unit);
 }
 
-async function goToVenue(venueId, venueType, geoUnitName) {
+async function goToVenue(venueId) {
+  let location;
+  try {
+    location = await fetchJson(`/api/explorer/venue/${venueId}/locate?per_page=50`);
+  } catch (err) {
+    console.error('Failed to locate venue:', err);
+    return;
+  }
   state.highlightVenueId   = venueId;
-  state.highlightVenueType = venueType;
-  await loadUnit(geoUnitName);
+  state.highlightVenueType = location.venue_type;
+  state.highlightVenuePage = location.page;
+  await loadUnit(location.geo_unit);
 }

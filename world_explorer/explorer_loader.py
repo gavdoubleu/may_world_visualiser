@@ -10,12 +10,20 @@ _SEX_DECODE = {0: 'male', 1: 'female', 2: 'unknown'}
 
 class ExplorerLoader:
     def __init__(self, hdf5_path, person_id_to_idx, subset_venue_ids, geography,
-                 subtree_index=None):
+                 subtree_index=None, person_geo_unit_ids=None, venue_geo_unit_ids=None,
+                 venue_types_arr=None, venue_type_names=None,
+                 venue_list_position=None, person_list_position=None):
         self._hdf5_path = str(hdf5_path)
-        self._person_id_to_idx = person_id_to_idx
-        self._subset_venue_ids = subset_venue_ids
-        self._geography = geography
-        self._subtree_index = subtree_index
+        self._person_id_to_idx    = person_id_to_idx
+        self._subset_venue_ids    = subset_venue_ids
+        self._geography           = geography
+        self._subtree_index       = subtree_index
+        self._person_geo_unit_ids = person_geo_unit_ids
+        self._venue_geo_unit_ids  = venue_geo_unit_ids
+        self._venue_types_arr     = venue_types_arr
+        self._venue_type_names_cache = venue_type_names or []
+        self._venue_list_position = venue_list_position
+        self._person_list_position = person_list_position
 
     def load_person_activities(self, person_id: int) -> list[dict] | None:
         """Return ActivityMap records for person_id, or None if not found."""
@@ -305,6 +313,42 @@ class ExplorerLoader:
                 'properties': {},
                 'subsets': self._venue_subsets(f, venue_id),
             }
+
+    # ── locate (O(1) page lookup from startup position arrays) ───────────────────
+
+    def locate_venue(self, venue_id: int, per_page: int) -> dict | None:
+        """Return {geo_unit, venue_type, page} for venue_id, or None if invalid."""
+        if (self._venue_geo_unit_ids is None
+                or venue_id < 0
+                or venue_id >= len(self._venue_geo_unit_ids)):
+            return None
+        geo_id     = int(self._venue_geo_unit_ids[venue_id])
+        unit       = self._geography.units_by_id.get(geo_id)
+        type_code  = int(self._venue_types_arr[venue_id])
+        venue_type = (self._venue_type_names_cache[type_code]
+                      if type_code < len(self._venue_type_names_cache) else 'unknown')
+        position   = int(self._venue_list_position[venue_id])
+        return {
+            'geo_unit':   unit.name if unit else None,
+            'venue_type': venue_type,
+            'page':       position // per_page + 1,
+        }
+
+    def locate_person(self, person_id: int, per_page: int) -> dict | None:
+        """Return {geo_unit, page} for person_id, or None if invalid."""
+        if (self._person_geo_unit_ids is None
+                or self._person_id_to_idx is None
+                or person_id < 0
+                or person_id >= len(self._person_id_to_idx)):
+            return None
+        array_idx = int(self._person_id_to_idx[person_id])
+        geo_id    = int(self._person_geo_unit_ids[array_idx])
+        unit      = self._geography.units_by_id.get(geo_id)
+        position  = int(self._person_list_position[array_idx])
+        return {
+            'geo_unit': unit.name if unit else None,
+            'page':     position // per_page + 1,
+        }
 
     # ── small helpers ────────────────────────────────────────────────────────────
 

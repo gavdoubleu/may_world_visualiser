@@ -61,13 +61,21 @@ class ExplorerWorld:
     """
 
     def __init__(self, geography, slim_statistics, unit_statistics,
-                 person_id_to_idx, subset_venue_ids, subtree_index):
+                 person_id_to_idx, subset_venue_ids, subtree_index,
+                 person_geo_unit_ids, venue_geo_unit_ids, venue_types_arr,
+                 venue_type_names, venue_list_position, person_list_position):
         self.geography = geography
         self._slim_statistics = slim_statistics
         self._unit_statistics = unit_statistics
         self.person_id_to_idx = person_id_to_idx
         self.subset_venue_ids = subset_venue_ids
         self.subtree_index = subtree_index
+        self.person_geo_unit_ids  = person_geo_unit_ids
+        self.venue_geo_unit_ids   = venue_geo_unit_ids
+        self.venue_types_arr      = venue_types_arr
+        self.venue_type_names     = venue_type_names
+        self.venue_list_position  = venue_list_position
+        self.person_list_position = person_list_position
         self.population = None
         self.venues = None
 
@@ -157,7 +165,54 @@ def _build_subtree_index(f, geography):
     venue_rows, venue_ranges = _build_row_ranges(
         venue_geo_ids, order_by_uid, size_by_uid, max_geo_id)
 
-    return SubtreeIndex(person_rows, person_ranges, venue_rows, venue_ranges)
+    index = SubtreeIndex(person_rows, person_ranges, venue_rows, venue_ranges)
+    return index, person_geo_ids, venue_geo_ids
+
+
+# ─── locate index construction ───────────────────────────────────────────────
+
+def _build_locate_indices(subtree_index, geography,
+                          venue_geo_unit_ids, venue_types_arr,
+                          person_geo_unit_ids):
+    """Build O(1) position lookup arrays for venue and person locate endpoints.
+
+    venue_list_position[venue_id]   = rank of venue within its direct geo unit's
+                                      subtree listing, filtered by type.
+    person_list_position[array_idx] = rank of person within their direct geo unit's
+                                      subtree person listing.
+
+    Positions are 0-indexed and per_page-independent; callers divide by per_page
+    to get page numbers.
+    """
+    num_venues  = len(venue_geo_unit_ids)
+    num_persons = len(person_geo_unit_ids)
+
+    venue_list_position  = np.zeros(num_venues,  dtype=np.int32)
+    person_list_position = np.zeros(num_persons, dtype=np.int32)
+
+    for unit_id in geography.units_by_id:
+        # ── venue positions ───────────────────────────────────────────────────
+        v_rows = np.sort(subtree_index.venue_rows(unit_id))
+        if len(v_rows):
+            direct_mask = venue_geo_unit_ids[v_rows] == unit_id
+            if np.any(direct_mask):
+                v_types = venue_types_arr[v_rows]
+                for type_code in np.unique(v_types[direct_mask]):
+                    same_type_mask     = (v_types == type_code)
+                    same_type_rows     = v_rows[same_type_mask]   # sorted, whole subtree
+                    direct_of_type     = direct_mask & same_type_mask
+                    direct_venue_ids   = v_rows[direct_of_type]
+                    positions          = np.searchsorted(same_type_rows, direct_venue_ids)
+                    venue_list_position[direct_venue_ids] = positions
+
+        # ── person positions ──────────────────────────────────────────────────
+        p_rows = np.sort(subtree_index.person_rows(unit_id))
+        if len(p_rows):
+            direct_mask    = person_geo_unit_ids[p_rows] == unit_id
+            direct_indices = np.where(direct_mask)[0]
+            person_list_position[p_rows[direct_indices]] = direct_indices
+
+    return venue_list_position, person_list_position
 
 
 # ─── per-unit statistics (explorer-slim: no activity-map crunch) ──────────────
@@ -338,11 +393,25 @@ def load_explorer_world(input_file):
         person_id_to_idx[person_ids] = np.arange(len(person_ids), dtype=person_ids.dtype)
         subset_venue_ids = f['venues/subsets/venue_ids'][:]
 
-        subtree_index = _build_subtree_index(f, geography)
+        subtree_index, person_geo_unit_ids, venue_geo_unit_ids = (
+            _build_subtree_index(f, geography))
+
+        venue_types_arr  = f['venues/types'][:] if 'venues/types' in f else np.array([], dtype=np.uint8)
+        venue_type_names = []
+        if 'metadata/registries/venue_types' in f:
+            venue_type_names = [n.decode() if isinstance(n, bytes) else str(n)
+                                for n in f['metadata/registries/venue_types'][:]]
+
+    venue_list_position, person_list_position = _build_locate_indices(
+        subtree_index, geography,
+        venue_geo_unit_ids, venue_types_arr, person_geo_unit_ids,
+    )
 
     world = ExplorerWorld(
         geography, None, unit_statistics,
         person_id_to_idx, subset_venue_ids, subtree_index,
+        person_geo_unit_ids, venue_geo_unit_ids, venue_types_arr,
+        venue_type_names, venue_list_position, person_list_position,
     )
     logger.info("Explorer world loaded in %.2fs: %s",
                 time.perf_counter() - t_start, world)

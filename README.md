@@ -72,23 +72,53 @@ python launch_world_map.py --world-file data/world_state_medieval.h5 \
     --map-attribution "Medieval England 1348 AD"
 ```
 
+## WorldExplorer
+
+File-explorer browser for inspecting a world file. Uses a lazy HDF5 backend — only the geography tree and aggregate statistics are held in memory; People/Venues/Subsets are loaded on demand. Cold-start: ~1.7s (vs ~49s for WorldMap on the medieval dataset).
+
+```bash
+python launch_world_explorer.py --world-file data/world_state_medieval.h5
+```
+
+Open `http://127.0.0.1:5001` in a browser.
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host` | `127.0.0.1` | Server host |
+| `--port` | `5001` | Server port |
+| `--debug` | off | Flask debug mode |
+
+See [`docs/world_explorer.md`](docs/world_explorer.md) for full architecture and API reference.
+
 ## Project layout
 
 ```
 may_world_visualiser/
-├── launch_world_map.py     # live server entry point
-├── export_static.py        # static export entry point
-├── *.sh                    # convenience shell scripts
+├── launch_world_map.py      # WorldMap live server entry point
+├── launch_world_explorer.py # WorldExplorer live server entry point
+├── export_static.py         # static export entry point
+├── *.sh                     # convenience shell scripts
 ├── requirements.txt
-└── world_map/              # importable package
-    ├── app.py              # Flask factory create_app()
-    ├── core/               # domain classes and HDF5 loader
-    ├── routes/             # Flask blueprints (geography, population, venues, events)
-    ├── events/             # event loading and analysis
-    ├── themes/             # CSS theme generation
-    └── yaml/               # config files (app_config, themes, panels, events)
+├── docs/
+│   ├── adr/                 # architecture decision records
+│   └── world_explorer.md    # WorldExplorer architecture + API reference
+├── world_map/               # WorldMap package (eager in-memory model)
+│   ├── app.py               # Flask factory create_app()
+│   ├── core/                # domain classes and HDF5 loader
+│   ├── routes/              # Flask blueprints (geography, population, venues, events)
+│   ├── events/              # event loading and analysis
+│   ├── themes/              # CSS theme generation
+│   └── yaml/                # config files (app_config, themes, panels, events)
+└── world_explorer/          # WorldExplorer package (lazy HDF5 backend)
+    ├── app.py               # Flask factory create_app()
+    ├── explorer_world_loader.py  # load_explorer_world(), SubtreeIndex
+    ├── explorer_loader.py   # on-demand HDF5 reads (ExplorerLoader)
+    ├── context.py           # ExplorerContext
+    └── routes/              # explorer_bp blueprint
 ```
 
 ## Data format
 
-World state is loaded from `.h5`/`.hdf5` files via `world_map/core/world_loader.py`. Events are loaded from a separate `simulation_events.h5`.
+World state is loaded from `.h5`/`.hdf5` files. WorldMap uses `world_map/core/world_loader.py`; WorldExplorer uses `world_explorer/explorer_world_loader.py`. Events are loaded from a separate `simulation_events.h5`.

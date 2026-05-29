@@ -30,6 +30,12 @@ def create_app(world, hdf5_path):
         world.subset_venue_ids,
         world.geography,
         world.subtree_index,
+        world.person_geo_unit_ids,
+        world.venue_geo_unit_ids,
+        world.venue_types_arr,
+        world.venue_type_names,
+        world.venue_list_position,
+        world.person_list_position,
     )
     app.config[_EXPLORER_CTX_KEY] = ExplorerContext(
         world=world,
