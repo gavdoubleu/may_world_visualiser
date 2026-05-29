@@ -926,8 +926,12 @@ function buildVenueDetailHtml(venue) {
       </div>` : ''}
       ${coords ? `
       <div class="detail-item">
-        <div class="detail-item__label">Coordinates</div>
-        <div class="detail-item__value" style="font-size:0.8rem">${esc(String(coords))}</div>
+        <div class="detail-item__label">Latitude</div>
+        <div class="detail-item__value">${(+coords[0]).toFixed(4)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item__label">Longitude</div>
+        <div class="detail-item__value">${(+coords[1]).toFixed(4)}</div>
       </div>` : ''}
     </div>`;
 
