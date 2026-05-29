@@ -1066,6 +1066,10 @@ function buildVenueDetailHtml(venue) {
   let html = `
     <div class="detail-grid">
       <div class="detail-item">
+        <div class="detail-item__label">ID</div>
+        <div class="detail-item__value">${venue.id}</div>
+      </div>
+      <div class="detail-item">
         <div class="detail-item__label">Name</div>
         <div class="detail-item__value">${esc(venue.name)}</div>
       </div>
