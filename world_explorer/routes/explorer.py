@@ -112,7 +112,7 @@ def get_unit_people(unit_name):
         return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
     page     = request.args.get('page', 1, type=int)
-    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    per_page = min(request.args.get('per_page', 30, type=int), 200)
     return jsonify(ctx.explorer_loader.load_unit_people(unit_name, page, per_page))
 
 
@@ -126,7 +126,7 @@ def get_unit_venues(unit_name):
 
     venue_type_filter = request.args.get('type')
     page     = request.args.get('page', 1, type=int)
-    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    per_page = min(request.args.get('per_page', 30, type=int), 200)
     return jsonify(ctx.explorer_loader.load_unit_venues(
         unit_name, page, per_page, venue_type_filter))
 
@@ -163,7 +163,7 @@ def get_venue_detail(venue_id):
 
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/locate')
 def locate_venue(venue_id):
-    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    per_page = min(request.args.get('per_page', 30, type=int), 200)
     result   = get_explorer_context().explorer_loader.locate_venue(venue_id, per_page)
     if result is None or result['geo_unit'] is None:
         return jsonify({'error': f'Venue {venue_id} not found'}), 404
@@ -172,7 +172,7 @@ def locate_venue(venue_id):
 
 @explorer_bp.route('/api/explorer/person/<int:person_id>/locate')
 def locate_person(person_id):
-    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    per_page = min(request.args.get('per_page', 30, type=int), 200)
     result   = get_explorer_context().explorer_loader.locate_person(person_id, per_page)
     if result is None or result['geo_unit'] is None:
         return jsonify({'error': f'Person {person_id} not found'}), 404
@@ -182,7 +182,7 @@ def locate_person(person_id):
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/members')
 def get_venue_members(venue_id):
     loader   = get_explorer_context().explorer_loader
-    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    per_page = min(request.args.get('per_page', 30, type=int), 200)
     page     = max(1, request.args.get('page', 1, type=int))
     result   = loader.load_venue_members(venue_id, page, per_page, request.args.get('subset'))
     return jsonify(result)
