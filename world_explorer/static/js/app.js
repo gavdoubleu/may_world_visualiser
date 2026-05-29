@@ -243,7 +243,7 @@ async function loadUnit(name, { pushHistory = true } = {}) {
   setDetailLoading();
 
   try {
-    state.currentUnit = await fetchJson(`/api/geography/unit/${encodeURIComponent(name)}`);
+    state.currentUnit = await fetchJson(`/api/explorer/unit/${encodeURIComponent(name)}`);
   } catch (err) {
     detail.innerHTML = `<div style="padding:2rem;color:var(--theme-text-muted)">Error: ${esc(err.message)}</div>`;
     return;
@@ -609,8 +609,8 @@ async function loadPeople(unitName, page) {
   let data;
   try {
     data = await fetchJson(
-      `/api/geography/unit/${encodeURIComponent(unitName)}/people` +
-      `?page=${page}&per_page=50&include_descendants=true`
+      `/api/explorer/unit/${encodeURIComponent(unitName)}/people` +
+      `?page=${page}&per_page=50`
     );
   } catch (err) {
     tableWrap.innerHTML =
@@ -774,7 +774,7 @@ async function openPersonPanel(personId, { pushHistory = true } = {}) {
 
   let person;
   try {
-    person = await fetchJson(`/api/population/person/${personId}`);
+    person = await fetchJson(`/api/explorer/person/${personId}`);
   } catch (err) {
     content.innerHTML = `<div style="color:var(--theme-text-muted);font-size:0.82rem">Error: ${esc(err.message)}</div>`;
     return;

@@ -6,7 +6,6 @@ import pytest
 import h5py
 from flask import Flask
 
-from world_map.context import _CTX_KEY
 from world_map.testing import WorldBuilder
 from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
 from world_explorer.explorer_loader import ExplorerLoader
@@ -53,10 +52,8 @@ def explorer_client(venue_members_h5):
 
     app = Flask(__name__)
     app.config['TESTING']         = True
-    app.config[_CTX_KEY]          = WorldBuilder().build_context()
     app.config[_EXPLORER_CTX_KEY] = ExplorerContext(
         world=world,
-        venue_index={},
         explorer_loader=loader,
     )
     app.register_blueprint(explorer_bp)

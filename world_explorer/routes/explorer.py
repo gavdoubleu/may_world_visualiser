@@ -7,8 +7,8 @@ import yaml
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
 from world_explorer.context import get_explorer_context
-from world_map.core.pagination import paginate
 from world_map.themes.theme_css import build_root_block
+from world_map.utils import convert_numpy_types
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,62 @@ def get_tree():
     return jsonify(nodes)
 
 
+@explorer_bp.route('/api/explorer/unit/<unit_name>')
+def get_unit_detail(unit_name):
+    """Unit detail built from the explorer's geography + aggregate statistics."""
+    world = get_explorer_context().world
+    if not world.geography:
+        return jsonify({'error': 'No geography data'}), 404
+
+    unit = world.geography.get_unit(unit_name)
+    if not unit:
+        return jsonify({'error': f'Unit {unit_name} not found'}), 404
+
+    stats = world._unit_statistics.get(unit_name)
+    if stats is None:
+        return jsonify({'error': f'No statistics for unit {unit_name}'}), 404
+
+    parent_info = None
+    if unit.parent:
+        parent_info = {'id': unit.parent.id, 'name': unit.parent.name,
+                       'level': unit.parent.level}
+
+    children_info = []
+    for child in (unit.children or []):
+        child_stats = world._unit_statistics.get(child.name)
+        children_info.append({
+            'id': child.id, 'name': child.name, 'level': child.level,
+            'population': child_stats.population if child_stats else 0,
+        })
+
+    return jsonify(convert_numpy_types({
+        'id': unit.id,
+        'name': unit.name,
+        'level': unit.level,
+        'coordinates': unit.coordinates,
+        **stats.to_dict(),
+        'parent': parent_info,
+        'children': children_info,
+        'properties': unit.properties,
+        'slim_mode': True,
+        'display_name_enabled': False,
+        'display_name': None,
+    }))
+
+
+@explorer_bp.route('/api/explorer/unit/<unit_name>/people')
+def get_unit_people(unit_name):
+    ctx = get_explorer_context()
+    if not ctx.world.geography:
+        return jsonify({'error': 'No geography data'}), 404
+    if not ctx.world.geography.get_unit(unit_name):
+        return jsonify({'error': f'Unit {unit_name} not found'}), 404
+
+    page     = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 50, type=int), 200)
+    return jsonify(ctx.explorer_loader.load_unit_people(unit_name, page, per_page))
+
+
 @explorer_bp.route('/api/explorer/unit/<unit_name>/venues')
 def get_unit_venues(unit_name):
     ctx = get_explorer_context()
@@ -71,40 +127,21 @@ def get_unit_venues(unit_name):
     venue_type_filter = request.args.get('type')
     page     = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 200)
-
-    all_venues = ctx.explorer_loader.collect_unit_venues(unit_name)
-    if venue_type_filter:
-        all_venues = [v for v in all_venues if v.type == venue_type_filter]
-
-    sl = paginate(all_venues, page, per_page)
-
-    return jsonify({
-        'unit_name':   unit_name,
-        'venue_type':  venue_type_filter,
-        'total_count': sl.total,
-        'page':        sl.page,
-        'per_page':    sl.per_page,
-        'total_pages': sl.total_pages,
-        'venues': [
-            {
-                'id':          v.id,
-                'name':        v.name,
-                'type':        v.type,
-                'coordinates': v.coordinates,
-                'properties':  v.properties or {},
-                'subsets': [
-                    {'name': s_name, 'num_members': s.num_members}
-                    for s_name, s in (v.subsets.items() if hasattr(v, 'subsets') else [])
-                ],
-            }
-            for v in sl.items
-        ],
-    })
+    return jsonify(ctx.explorer_loader.load_unit_venues(
+        unit_name, page, per_page, venue_type_filter))
 
 
 @explorer_bp.route('/static/images/<path:filename>')
 def serve_image(filename):
     return send_from_directory(_IMAGES_DIR, filename)
+
+
+@explorer_bp.route('/api/explorer/person/<int:person_id>')
+def get_person_detail(person_id):
+    person = get_explorer_context().explorer_loader.load_person_slim(person_id)
+    if person is None:
+        return jsonify({'error': f'Person {person_id} not found'}), 404
+    return jsonify(person)
 
 
 @explorer_bp.route('/api/explorer/person/<int:person_id>/full')
@@ -118,24 +155,10 @@ def get_person_full(person_id):
 
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/detail')
 def get_venue_detail(venue_id):
-    world = get_explorer_context().world
-    all_venues = world.venues.get_all_venues()
-    venue = all_venues.get(venue_id)
-    if not venue:
+    venue = get_explorer_context().explorer_loader.load_venue_detail(venue_id)
+    if venue is None:
         return jsonify({'error': f'Venue {venue_id} not found'}), 404
-    geo_unit = venue.geographical_unit
-    return jsonify({
-        'id':          venue.id,
-        'name':        venue.name,
-        'type':        venue.type,
-        'geo_unit':    geo_unit.name if geo_unit else None,
-        'coordinates': venue.coordinates,
-        'properties':  venue.properties or {},
-        'subsets': [
-            {'name': s_name, 'num_members': s.num_members}
-            for s_name, s in venue.subsets.items()
-        ],
-    })
+    return jsonify(venue)
 
 
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/members')

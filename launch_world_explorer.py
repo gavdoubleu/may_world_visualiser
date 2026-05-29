@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-from world_map.core.world_loader import load_world_from_hdf5
+from world_explorer.explorer_world_loader import load_explorer_world
 from world_explorer.app import create_app
 
 
@@ -42,7 +42,7 @@ Examples:
 
     print(f'Loading world from: {world_path}')
     try:
-        world = load_world_from_hdf5(str(world_path))
+        world = load_explorer_world(str(world_path))
     except Exception as exc:
         print(f'\nERROR: failed to load world: {exc}\n')
         sys.exit(1)

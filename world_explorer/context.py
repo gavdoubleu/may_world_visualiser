@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from flask import current_app
 
-from world_map.core.world_data import WorldData
 from world_explorer.explorer_loader import ExplorerLoader
 
 _EXPLORER_CTX_KEY = 'EXPLORER_CONTEXT'
@@ -14,8 +14,7 @@ _EXPLORER_CTX_KEY = 'EXPLORER_CONTEXT'
 
 @dataclass
 class ExplorerContext:
-    world: WorldData
-    venue_index: dict
+    world: Any  # ExplorerWorld: geography + aggregate stats, lazy people/venues
     explorer_loader: ExplorerLoader
 
 
