@@ -115,18 +115,18 @@ def test_aggregator_available_types():
     assert 'infections' in agg.available_event_types()
 
 
-def test_aggregator_geojson_windowed():
+def test_aggregator_aggregate_windowed():
     agg = _make_aggregator()
-    result = agg.geojson('infections', 0.0, 3.0)
-    assert result['type'] == 'FeatureCollection'
-    assert result['properties']['total_count'] == 1   # only t=1 event in window
-    assert len(result['features']) == 1
+    raw = agg.aggregate('infections', 0.0, 3.0)
+    total = sum(d['count'] for d in raw.values())
+    assert total == 1   # only t=1 event in window
 
 
-def test_aggregator_geojson_cumulative():
+def test_aggregator_aggregate_all():
     agg = _make_aggregator()
-    result = agg.geojson('infections', 0.0, 5.0, cumulative=True)
-    assert result['properties']['total_count'] == 2
+    raw = agg.aggregate('infections', 0.0, 10.0)
+    total = sum(d['count'] for d in raw.values())
+    assert total == 2
 
 
 def test_aggregator_aggregated_str_keys():

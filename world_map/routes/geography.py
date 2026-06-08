@@ -5,6 +5,7 @@ import logging
 
 from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
+from world_map.geojson import point_feature, feature_collection
 
 logger = logging.getLogger(__name__)
 
@@ -51,26 +52,18 @@ def get_geography_level(level):
             lat, lon = unit.coordinates
             stats = world._unit_statistics.get(unit_name)
 
-            feature = {
-                'type': 'Feature',
-                'properties': {
-                    'id': int(unit.id) if hasattr(unit.id, 'item') else unit.id,
-                    'name': str(unit.name),
-                    'level': str(unit.level),
-                    'population': stats.population if stats else 0,
-                    'venues_count': stats.venues_count if stats else 0,
-                    'venue_types': stats.venue_types if stats else {},
-                    'has_parent': unit.parent is not None,
-                    'children_count': int(len(unit.children)) if unit.children else 0
-                },
-                'geometry': {
-                    'type': 'Point',
-                    'coordinates': [float(lon), float(lat)]
-                }
-            }
-            features.append(feature)
+            features.append(point_feature(lat, lon, {
+                'id': int(unit.id) if hasattr(unit.id, 'item') else unit.id,
+                'name': str(unit.name),
+                'level': str(unit.level),
+                'population': stats.population if stats else 0,
+                'venues_count': stats.venues_count if stats else 0,
+                'venue_types': stats.venue_types if stats else {},
+                'has_parent': unit.parent is not None,
+                'children_count': int(len(unit.children)) if unit.children else 0,
+            }))
 
-        geojson = {'type': 'FeatureCollection', 'features': features}
+        geojson = feature_collection(features)
         logger.info(f"Returned {len(features)} features for level {level}")
         return jsonify(geojson)
 

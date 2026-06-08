@@ -5,6 +5,7 @@ import logging
 
 from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
+from world_map.geojson import point_feature, feature_collection
 from world_reader.statistics import compute_venue_type_counts, venue_type_names_present
 
 logger = logging.getLogger(__name__)
@@ -34,23 +35,16 @@ def get_venues_by_type(venue_type):
         features = []
         for venue in venues:
             lat, lon = venue['coordinates']
-            features.append({
-                'type': 'Feature',
-                'properties': {
-                    'id': venue['id'],
-                    'name': venue['name'],
-                    'type': venue['type'],
-                    'geographical_unit': venue['geo_unit'],
-                    'num_members': venue['num_members'],
-                    'properties': convert_numpy_types(venue['properties']),
-                },
-                'geometry': {
-                    'type': 'Point',
-                    'coordinates': [lon, lat],
-                },
-            })
+            features.append(point_feature(lat, lon, {
+                'id': venue['id'],
+                'name': venue['name'],
+                'type': venue['type'],
+                'geographical_unit': venue['geo_unit'],
+                'num_members': venue['num_members'],
+                'properties': convert_numpy_types(venue['properties']),
+            }))
 
-        geojson = {'type': 'FeatureCollection', 'features': features}
+        geojson = feature_collection(features)
         logger.info(f"Returned {len(features)} venues of type {venue_type}")
         return jsonify(geojson)
 

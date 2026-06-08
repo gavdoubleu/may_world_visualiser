@@ -1,4 +1,4 @@
-"""Event aggregation, caching, and GeoJSON serialisation."""
+"""Event aggregation and caching."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ _AggResult = dict[int, _GeoResult]  # internal; int keys
 
 class EventAggregator:
     """
-    Computation, caching, and GeoJSON serialisation for simulation events.
+    Computation and caching for simulation events.
 
     Constructed directly in tests from a hand-built EventDataBundle —
     no HDF5 file required.
@@ -110,51 +110,6 @@ class EventAggregator:
     def event_summary(self) -> dict[str, int]:
         return {k: len(v) for k, v in self._bundle.events_sorted.items()}
 
-    def geojson(
-        self,
-        event_type: str,
-        time_start: float,
-        time_end: float,
-        *,
-        method: str = 'count',
-        cumulative: bool = False,
-    ) -> dict:
-        if cumulative:
-            raw = self._aggregate(event_type, self._bundle.time_min, time_end, method)
-        else:
-            raw = self._aggregate(event_type, time_start, time_end, method)
-
-        features = []
-        for geo_unit_id, data in raw.items():
-            if 'coords' not in data:
-                continue
-            lat, lon = data['coords']
-            features.append({
-                'type': 'Feature',
-                'properties': {
-                    'geo_unit_id': geo_unit_id,
-                    'count': data['count'],
-                    'rate': data.get('rate', 0.0),
-                },
-                'geometry': {
-                    'type': 'Point',
-                    'coordinates': [float(lon), float(lat)],
-                },
-            })
-
-        return {
-            'type': 'FeatureCollection',
-            'features': features,
-            'properties': {
-                'event_type': event_type,
-                'time_start': time_start,
-                'time_end': time_end,
-                'method': method,
-                'cumulative': cumulative,
-                'total_count': sum(d['count'] for d in raw.values()),
-            },
-        }
-
     def timeseries(self, event_type: str) -> list[dict]:
         """Daily event counts as list[{'day': int, 'count': int}]."""
         sorted_arr = self._bundle.events_sorted.get(event_type)
@@ -175,7 +130,7 @@ class EventAggregator:
         JSON-safe aggregation result keyed by str(geo_unit_id).
         Includes count, optional rate, optional coords [lat, lon].
         """
-        raw = self._aggregate(event_type, time_start, time_end, method)
+        raw = self.aggregate(event_type, time_start, time_end, method)
         result: dict[str, dict] = {}
         for geo_unit_id, data in raw.items():
             entry: dict[str, Any] = {'count': data['count']}
@@ -191,7 +146,7 @@ class EventAggregator:
     # Internal
     # ------------------------------------------------------------------
 
-    def _aggregate(
+    def aggregate(
         self,
         event_type: str,
         time_start: float,

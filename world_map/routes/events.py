@@ -1,18 +1,50 @@
-"""Events API and events page blueprint."""
+"""Events API blueprint."""
 
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request
 import logging
 
 from world_map.context import get_app_context
+from world_map.geojson import point_feature, feature_collection
 
 logger = logging.getLogger(__name__)
 
 events_bp = Blueprint('events', __name__)
 
 
+def _build_events_geojson(loader, event_type, time_start, time_end, method, cumulative):
+    if cumulative:
+        raw = loader.aggregate(event_type, loader.time_range[0], time_end, method)
+    else:
+        raw = loader.aggregate(event_type, time_start, time_end, method)
+
+    features = [
+        point_feature(
+            data['coords'][0], data['coords'][1],
+            {'geo_unit_id': geo_unit_id, 'count': data['count'],
+             'rate': data.get('rate', 0.0)},
+        )
+        for geo_unit_id, data in raw.items()
+        if 'coords' in data
+    ]
+    result = feature_collection(features)
+    result['properties'] = {
+        'event_type': event_type,
+        'time_start': time_start,
+        'time_end': time_end,
+        'method': method,
+        'cumulative': cumulative,
+        'total_count': sum(d['count'] for d in raw.values()),
+    }
+    return result
+
+
 @events_bp.route('/api/events/config')
 def get_event_config():
-    return jsonify(get_app_context().app_config.events)
+    try:
+        return jsonify(get_app_context().app_config.events)
+    except Exception as e:
+        logger.error(f"Error getting event config: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @events_bp.route('/api/events/summary')
@@ -20,13 +52,17 @@ def get_events_summary():
     ctx = get_app_context()
     if ctx.event_loader is None:
         return jsonify({'error': 'Events not loaded'}), 404
-    loader = ctx.event_loader
-    time_min, time_max = loader.time_range
-    return jsonify({
-        'available_types': loader.available_event_types(),
-        'counts': loader.event_summary(),
-        'time_range': (time_min, time_max),
-    })
+    try:
+        loader = ctx.event_loader
+        time_min, time_max = loader.time_range
+        return jsonify({
+            'available_types': loader.available_event_types(),
+            'counts': loader.event_summary(),
+            'time_range': (time_min, time_max),
+        })
+    except Exception as e:
+        logger.error(f"Error getting events summary: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @events_bp.route('/api/events/geojson/batch')
@@ -54,9 +90,8 @@ def get_events_geojson_batch():
 
     try:
         results = {
-            event_type: loader.geojson(
-                event_type, time_start, time_end,
-                method=method, cumulative=cumulative,
+            event_type: _build_events_geojson(
+                loader, event_type, time_start, time_end, method, cumulative,
             )
             for event_type in event_types
         }
@@ -80,8 +115,9 @@ def get_events_geojson(event_type):
     cumulative = request.args.get('cumulative', default='false').lower() == 'true'
 
     try:
-        return jsonify(loader.geojson(event_type, time_start, time_end,
-                                      method=method, cumulative=cumulative))
+        return jsonify(_build_events_geojson(
+            loader, event_type, time_start, time_end, method, cumulative,
+        ))
     except Exception as e:
         logger.error(f"Error getting events geojson: {e}")
         return jsonify({'error': str(e)}), 500
@@ -125,8 +161,3 @@ def get_events_aggregated(event_type):
     except Exception as e:
         logger.error(f"Error getting aggregated events: {e}")
         return jsonify({'error': str(e)}), 500
-
-
-@events_bp.route('/events')
-def events_page():
-    return render_template('events_map.html')
