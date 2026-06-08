@@ -5,7 +5,7 @@ import pytest
 import h5py
 
 from world_map.testing import WorldBuilder
-from world_explorer.explorer_loader import ExplorerLoader
+from world_reader.explorer_loader import ExplorerLoader
 
 
 @pytest.fixture
@@ -83,8 +83,8 @@ def test_load_person_activities_returns_none_for_unknown_id(loader):
 
 # --- lazy subtree-backed reads (load_explorer_world end-to-end) ---
 
-from world_explorer.explorer_world_loader import load_explorer_world
-from world_explorer.explorer_loader import ExplorerLoader as _EL
+from world_reader.explorer_world import load_explorer_world
+from world_reader.explorer_loader import ExplorerLoader as _EL
 
 
 @pytest.fixture

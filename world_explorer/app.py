@@ -21,7 +21,7 @@ def create_app(world, hdf5_path):
                 static_url_path='/static')
     CORS(app)
 
-    from world_explorer.explorer_loader import ExplorerLoader
+    from world_reader.explorer_loader import ExplorerLoader
     from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
 
     explorer_loader = ExplorerLoader(

@@ -8,7 +8,7 @@ from flask import Flask
 
 from world_map.testing import WorldBuilder
 from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
-from world_explorer.explorer_loader import ExplorerLoader
+from world_reader.explorer_loader import ExplorerLoader
 from world_explorer.routes.explorer import explorer_bp
 
 

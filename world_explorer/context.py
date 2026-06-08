@@ -7,7 +7,7 @@ from typing import Any
 
 from flask import current_app
 
-from world_explorer.explorer_loader import ExplorerLoader
+from world_reader.explorer_loader import ExplorerLoader
 
 _EXPLORER_CTX_KEY = 'EXPLORER_CONTEXT'
 
