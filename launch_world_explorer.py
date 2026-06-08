@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-from world_explorer.explorer_world_loader import load_explorer_world
+from world_reader.explorer_world import load_explorer_world
 from world_explorer.app import create_app
 
 

@@ -3,9 +3,8 @@
 import h5py
 import numpy as np
 
-from world_map.core.pagination import calc_total_pages
-
-_SEX_DECODE = {0: 'male', 1: 'female', 2: 'unknown'}
+from world_reader.convert import SEX_DECODE, decode_str
+from world_reader.pagination import calc_total_pages
 
 
 class ExplorerLoader:
@@ -58,7 +57,7 @@ class ExplorerLoader:
             venue_names      = f['metadata/names/venues']
             subset_names     = f['metadata/names/subsets']
             venue_types      = f['venues/types']
-            venue_type_names = [self._decode(n) for n in f['metadata/registries/venue_types'][:]]
+            venue_type_names = [decode_str(n) for n in f['metadata/registries/venue_types'][:]]
             venue_geo_ids    = f['venues/geo_unit_ids']
 
             activities = []
@@ -67,8 +66,8 @@ class ExplorerLoader:
                 venue_id     = int(row[2])
                 subset_pos   = int(row[3])
 
-                act_name   = self._decode(act_names[act_type_idx])
-                venue_name = self._decode(venue_names[venue_id])
+                act_name   = decode_str(act_names[act_type_idx])
+                venue_name = decode_str(venue_names[venue_id])
                 vtype_idx  = int(venue_types[venue_id])
                 venue_type = venue_type_names[vtype_idx] if vtype_idx < len(venue_type_names) else 'unknown'
 
@@ -80,7 +79,7 @@ class ExplorerLoader:
                 last_sub  = int(np.searchsorted(self._subset_venue_ids, venue_id, side='right'))
                 if first_sub < last_sub:
                     subset_row  = first_sub + subset_pos
-                    subset_name = self._decode(subset_names[subset_row])
+                    subset_name = decode_str(subset_names[subset_row])
                 else:
                     subset_name = str(subset_pos)
 
@@ -105,7 +104,7 @@ class ExplorerLoader:
             return {'venue_id': venue_id, 'venue_name': str(venue_id), 'subsets': []}
 
         with h5py.File(self._hdf5_path, 'r') as f:
-            venue_name       = self._decode(f['metadata/names/venues'][venue_id])
+            venue_name       = decode_str(f['metadata/names/venues'][venue_id])
             subset_names_arr = f['metadata/names/subsets']
             members_offsets  = f['venues/subsets/members_offsets']
             members_flat     = f['venues/subsets/members_flat']
@@ -119,7 +118,7 @@ class ExplorerLoader:
 
             result_subsets = []
             for subset_row in range(first_sub, last_sub):
-                sname = self._decode(subset_names_arr[subset_row])
+                sname = decode_str(subset_names_arr[subset_row])
 
                 if subset_filter and sname != subset_filter:
                     continue
@@ -165,7 +164,7 @@ class ExplorerLoader:
                     members.append({
                         'id':       int(id_val),
                         'age':      int(age_val),
-                        'sex':      _SEX_DECODE.get(int(sex_val), 'unknown'),
+                        'sex':      SEX_DECODE.get(int(sex_val), 'unknown'),
                         'geo_unit': geo_unit.name if geo_unit else str(int(geo_id_val)),
                     })
 
@@ -197,13 +196,13 @@ class ExplorerLoader:
 
         with h5py.File(self._hdf5_path, 'r') as f:
             age    = int(f['population/ages'][array_idx])
-            sex    = _SEX_DECODE.get(int(f['population/sexes'][array_idx]), 'unknown')
+            sex    = SEX_DECODE.get(int(f['population/sexes'][array_idx]), 'unknown')
             geo_id = int(f['population/geo_unit_ids'][array_idx])
 
             properties = {}
             if 'population/properties' in f:
                 for key in f['population/properties']:
-                    properties[key] = self._decode(f[f'population/properties/{key}'][array_idx])
+                    properties[key] = decode_str(f[f'population/properties/{key}'][array_idx])
 
         unit = self._geography.units_by_id.get(geo_id)
         geo_info = None
@@ -240,7 +239,7 @@ class ExplorerLoader:
             for id_val, age_val, sex_val in zip(ids, ages, sexes):
                 people.append({
                     'id': int(id_val), 'age': int(age_val),
-                    'sex': _SEX_DECODE.get(int(sex_val), 'unknown'),
+                    'sex': SEX_DECODE.get(int(sex_val), 'unknown'),
                     'activities': [], 'primary_activity': None,
                 })
 
@@ -295,7 +294,7 @@ class ExplorerLoader:
                                            else 0)
                     venues.append({
                         'id': int(venue_id),
-                        'name': self._decode(name_b),
+                        'name': decode_str(name_b),
                         'type': (type_names[int(type_code)]
                                  if int(type_code) < len(type_names) else 'unknown'),
                         'coordinates': (None if np.isnan(lat)
@@ -325,7 +324,7 @@ class ExplorerLoader:
             geo_id     = int(f['venues/geo_unit_ids'][venue_id])
             return {
                 'id': venue_id,
-                'name': self._decode(f['metadata/names/venues'][venue_id]),
+                'name': decode_str(f['metadata/names/venues'][venue_id]),
                 'type': (type_names[type_code]
                          if type_code < len(type_names) else 'unknown'),
                 'geo_unit': self._unit_name(geo_id),
@@ -366,7 +365,7 @@ class ExplorerLoader:
                         idx, names, types, lats, lons, geo_ids):
                     venues.append({
                         'id': int(venue_row),
-                        'name': self._decode(name_b),
+                        'name': decode_str(name_b),
                         'type': (type_names[int(type_code)]
                                  if int(type_code) < len(type_names) else 'unknown'),
                         'coordinates': (None if np.isnan(lat) else [float(lat), float(lon)]),
@@ -432,7 +431,7 @@ class ExplorerLoader:
             return []
         names   = f['metadata/names/subsets'][first:last]
         counts  = f['venues/subsets/member_counts'][first:last]
-        return [{'name': self._decode(n), 'num_members': int(c)}
+        return [{'name': decode_str(n), 'num_members': int(c)}
                 for n, c in zip(names, counts)]
 
     def _unit_name(self, geo_id: int) -> str | None:
@@ -442,10 +441,6 @@ class ExplorerLoader:
     @staticmethod
     def _venue_type_names(f) -> list[str]:
         if 'metadata/registries/venue_types' in f:
-            return [ExplorerLoader._decode(n)
+            return [decode_str(n)
                     for n in f['metadata/registries/venue_types'][:]]
         return []
-
-    @staticmethod
-    def _decode(val) -> str:
-        return val.decode() if isinstance(val, bytes) else str(val)

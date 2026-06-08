@@ -5,10 +5,10 @@ statistics, and lightweight per-unit row indices. Person/Venue/Subset records
 are NOT materialised as Python objects — they are served on demand from HDF5 by
 ExplorerLoader. Contrast with world_map's eager in-memory object model.
 
-Reuses world_map's array-based helpers (_load_geography, _compute_slim_statistics)
-and world_reader's shared compute_unit_statistics; deliberately skips
-_load_population / _load_venues, which build millions of objects and dominate
-cold-start (~9.5s for population alone on the medieval dataset).
+Reuses world_reader's shared load_geography and compute_unit_statistics;
+deliberately skips loading population / venues as Python objects, which would
+build millions of objects and dominate cold-start (~9.5s for population alone
+on the medieval dataset).
 """
 
 import logging
@@ -17,8 +17,8 @@ import time
 import h5py
 import numpy as np
 
-from world_map.core.world_loader import _load_geography
 from world_reader import compute_unit_statistics
+from world_reader.geography import load_geography
 
 logger = logging.getLogger("explorer_world_loader")
 
@@ -252,7 +252,7 @@ def load_explorer_world(input_file):
         if 'geography' not in f:
             raise OSError("No geography data found in HDF5 file")
 
-        geography       = _load_geography(f['geography'], geo_names, level_registry)
+        geography       = load_geography(f['geography'], geo_names, level_registry)
         unit_statistics = compute_unit_statistics(f, geography, include_activity_counts=False)
 
         # lookup arrays (cheap; serve single-record lazy reads)
