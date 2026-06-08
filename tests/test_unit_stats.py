@@ -15,7 +15,7 @@ def test_unit_stats_construction():
 
 
 def test_unit_statistics_populated_after_build():
-    world = WorldBuilder().add_unit('Norfolk', level='county').build_world()
+    world = WorldBuilder().add_unit('Norfolk', level='county', population=1).build_world()
     assert 'Norfolk' in world._unit_statistics
     assert isinstance(world._unit_statistics['Norfolk'], UnitStats)
 
@@ -37,13 +37,8 @@ def test_parent_aggregates_descendants():
     world = (
         WorldBuilder()
         .add_unit('England', level='country')
-        .add_unit('Norfolk', level='county', population=100)
+        .add_unit('Norfolk', level='county', population=100, parent='England')
         .build_world()
     )
-    england = world.geography.get_unit('England')
-    norfolk = world.geography.get_unit('Norfolk')
-    norfolk.parent = england
-    england.children.append(norfolk)
-    world.compute_all_statistics()
 
     assert world._unit_statistics['England'].population == 100

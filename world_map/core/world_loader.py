@@ -12,7 +12,7 @@ import numpy as np
 
 from world_reader.convert import SEX_DECODE
 from world_reader.geography import load_geography as _load_geography
-from world_reader.statistics import compute_unit_statistics
+from world_reader.statistics import compute_unit_statistics, compute_slim_statistics
 
 from .world_data import (
     WorldData, PopulationManager, Person,
@@ -107,7 +107,7 @@ def load_world_from_hdf5(input_file, compute_activity_stats: bool = False):
         slim_statistics = None
         logger.info("Computing slim statistics...")
         try:
-            slim_statistics = _compute_slim_statistics(f, compute_activity_stats)
+            slim_statistics = compute_slim_statistics(f, compute_activity_stats)
         except Exception as exc:
             logger.warning(f"Failed to compute slim statistics: {exc}")
 
@@ -131,162 +131,6 @@ def load_world_from_hdf5(input_file, compute_activity_stats: bool = False):
     logger.info(f"Load complete: {world}")
     return world
 
-
-# ─── Slim statistics (verbatim from may/serialization/world_loader.py) ────────
-
-def _compute_array_stats(data, max_categories: int = 25) -> dict:
-    """Return numeric or categorical summary stats for a single HDF5 dataset array."""
-    if data.dtype.kind in ('f', 'u', 'i'):
-        arr = data.astype(np.float64).ravel()
-        finite = arr[np.isfinite(arr)]
-        if len(finite) == 0:
-            return {'type': 'numeric', 'count': 0}
-        return {
-            'type': 'numeric',
-            'count': int(len(finite)),
-            'mean': round(float(np.mean(finite)), 4),
-            'std': round(float(np.std(finite)), 4),
-            'min': float(np.min(finite)),
-            'max': float(np.max(finite)),
-            'p25': float(np.percentile(finite, 25)),
-            'median': float(np.median(finite)),
-            'p75': float(np.percentile(finite, 75)),
-        }
-    try:
-        values = data.astype(str)
-        unique, counts = np.unique(values, return_counts=True)
-        total = int(len(values))
-        order = np.argsort(-counts)
-        top_u = unique[order[:max_categories]]
-        top_c = counts[order[:max_categories]]
-        return {
-            'type': 'categorical',
-            'count': total,
-            'unique_count': int(len(unique)),
-            'top_values': {
-                str(k): {'count': int(v), 'pct': round(100.0 * v / total, 2)}
-                for k, v in zip(top_u, top_c)
-            },
-        }
-    except Exception as exc:
-        return {'type': 'unknown', 'error': str(exc)}
-
-
-def _compute_slim_statistics(f, compute_activity_stats: bool = False) -> dict:
-    """Compute aggregate statistics from an open HDF5 file.
-
-    `compute_activity_stats` gates the world-level activity-map breakdown
-    (an `np.unique` over the full activity map costing tens of seconds) —
-    skipped on the live WorldMap load path, computed for the static export.
-    """
-    stats: dict = {}
-
-    # ── person properties ────────────────────────────────────────────────────
-    person_stats: dict = {}
-    if 'population' in f:
-        pop = f['population']
-        if 'ages' in pop:
-            person_stats['age'] = _compute_array_stats(pop['ages'][:])
-        if 'sexes' in pop:
-            sex_raw = pop['sexes'][:]
-            if sex_raw.dtype.kind in ('u', 'i'):
-                _labels = np.array(['male', 'female', 'unknown'])
-                sexes = _labels[np.clip(sex_raw.astype(np.int64), 0, 2)]
-            else:
-                sexes = sex_raw.astype(str)
-            person_stats['sex'] = _compute_array_stats(sexes)
-        if 'properties' in pop:
-            for prop_name in pop['properties'].keys():
-                try:
-                    person_stats[prop_name] = _compute_array_stats(
-                        pop['properties'][prop_name][:]
-                    )
-                except Exception as exc:
-                    person_stats[prop_name] = {'type': 'error', 'error': str(exc)}
-    stats['person_properties'] = person_stats
-
-    # ── subset sizes ─────────────────────────────────────────────────────────
-    if 'venues' in f and 'subsets' in f['venues']:
-        mc = f['venues']['subsets']['member_counts'][:].astype(np.int64)
-        non_empty = mc[mc > 0]
-        if len(non_empty):
-            stats['subset_sizes'] = {
-                'mean': round(float(np.mean(non_empty)), 2),
-                'median': float(np.median(non_empty)),
-                'min': int(np.min(non_empty)),
-                'max': int(np.max(non_empty)),
-                'total_subsets': int(len(mc)),
-                'non_empty_subsets': int(len(non_empty)),
-            }
-
-    # ── activity map ─────────────────────────────────────────────────────────
-    activity_group_name = (
-        'activity_mappings' if 'activity_mappings' in f else 'relationships'
-    )
-    if (
-        compute_activity_stats
-        and activity_group_name in f
-        and 'activity_map' in f[activity_group_name]
-    ):
-        am               = f[activity_group_name]['activity_map']
-        activity_names   = am['activity_names'][:].astype(str)
-        activity_offsets = am['activity_offsets'][:]
-        activity_data    = am['activity_data'][:]
-
-        n_people = len(activity_offsets)
-        n_rows   = len(activity_data)
-
-        if n_rows > 0:
-            pairs = np.unique(activity_data[:, [0, 1]].astype(np.int64), axis=0)
-            people_per_act = np.zeros(len(activity_names), dtype=np.int64)
-            np.add.at(people_per_act, pairs[:, 1], 1)
-            unique_people    = int(len(np.unique(pairs[:, 0])))
-            mean_unique_acts = len(pairs) / unique_people if unique_people else 0.0
-        else:
-            people_per_act   = np.zeros(len(activity_names), dtype=np.int64)
-            unique_people    = 0
-            mean_unique_acts = 0.0
-
-        mean_assignments = n_rows / n_people if n_people else 0.0
-
-        if 'venues' in f and 'subsets' in f['venues'] and n_rows > 0:
-            mc_arr       = f['venues']['subsets']['member_counts'][:].astype(np.float64)
-            non_empty_mc = mc_arr[mc_arr > 0]
-            mean_contacts_est = (
-                round(float(np.mean(non_empty_mc - 1)) * mean_assignments, 1)
-                if len(non_empty_mc) else 0.0
-            )
-        else:
-            mean_contacts_est = 0.0
-
-        stats['activity_map'] = {
-            'activity_counts': {
-                str(activity_names[i]): int(people_per_act[i])
-                for i in range(len(activity_names))
-            },
-            'total_people_with_activities': unique_people,
-            'mean_activity_types_per_person': round(float(mean_unique_acts), 2),
-            'mean_venue_assignments_per_person': round(float(mean_assignments), 2),
-            'mean_contacts_estimate': mean_contacts_est,
-        }
-
-    # ── venue properties ─────────────────────────────────────────────────────
-    venue_prop_stats: dict = {}
-    if 'venues' in f and 'properties' in f['venues']:
-        for venue_type in f['venues']['properties'].keys():
-            vt_stats: dict = {}
-            for prop_name in f['venues']['properties'][venue_type].keys():
-                try:
-                    vt_stats[prop_name] = _compute_array_stats(
-                        f['venues']['properties'][venue_type][prop_name][:]
-                    )
-                except Exception as exc:
-                    vt_stats[prop_name] = {'type': 'error', 'error': str(exc)}
-            if vt_stats:
-                venue_prop_stats[venue_type] = vt_stats
-    stats['venue_properties'] = venue_prop_stats
-
-    return stats
 
 
 # ─── HDF5 loading functions ───────────────────────────────────────────────────
