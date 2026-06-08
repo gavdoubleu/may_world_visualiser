@@ -312,6 +312,41 @@ class ExplorerLoader:
             'total_pages': calc_total_pages(total, per_page), 'venues': venues,
         }
 
+    def load_venues_by_type(self, venue_type: str) -> list[dict]:
+        """All venues of `venue_type` with coordinates, as map-ready rows:
+        {id, name, type, geo_unit, coordinates, num_members, properties}.
+        Bulk array read — no per-venue Python objects."""
+        if (self._venue_types_arr is None
+                or venue_type not in self._venue_type_names_cache):
+            return []
+        type_code = self._venue_type_names_cache.index(venue_type)
+        rows = np.where(self._venue_types_arr == type_code)[0]
+        if not len(rows):
+            return []
+
+        venues = []
+        with h5py.File(self._hdf5_path, 'r') as f:
+            idx     = rows.tolist()
+            names   = f['metadata/names/venues'][idx]
+            lats    = f['venues/latitudes'][idx]
+            lons    = f['venues/longitudes'][idx]
+            geo_ids = f['venues/geo_unit_ids'][idx]
+            for venue_id, name_b, lat, lon, geo_id in zip(
+                    idx, names, lats, lons, geo_ids):
+                if np.isnan(lat):
+                    continue
+                subsets = self._venue_subsets(f, int(venue_id))
+                venues.append({
+                    'id': int(venue_id),
+                    'name': decode_str(name_b),
+                    'type': venue_type,
+                    'geo_unit': self._unit_name(int(geo_id)),
+                    'coordinates': [float(lat), float(lon)],
+                    'num_members': sum(s['num_members'] for s in subsets),
+                    'properties': {},
+                })
+        return venues
+
     def load_venue_detail(self, venue_id: int) -> dict | None:
         """Single venue detail (venue_id is a direct array row) plus its subsets."""
         with h5py.File(self._hdf5_path, 'r') as f:
