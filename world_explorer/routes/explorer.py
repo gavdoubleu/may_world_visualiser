@@ -113,7 +113,7 @@ def get_unit_people(unit_name):
 
     page     = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 200)
-    return jsonify(ctx.explorer_loader.load_unit_people(unit_name, page, per_page))
+    return jsonify(ctx.record_reader.load_unit_people(unit_name, page, per_page))
 
 
 @explorer_bp.route('/api/explorer/unit/<unit_name>/venues')
@@ -127,7 +127,7 @@ def get_unit_venues(unit_name):
     venue_type_filter = request.args.get('type')
     page     = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 200)
-    return jsonify(ctx.explorer_loader.load_unit_venues(
+    return jsonify(ctx.record_reader.load_unit_venues(
         unit_name, page, per_page, venue_type_filter))
 
 
@@ -138,7 +138,7 @@ def serve_image(filename):
 
 @explorer_bp.route('/api/explorer/person/<int:person_id>')
 def get_person_detail(person_id):
-    person = get_explorer_context().explorer_loader.load_person_slim(person_id)
+    person = get_explorer_context().record_reader.load_person_slim(person_id)
     if person is None:
         return jsonify({'error': f'Person {person_id} not found'}), 404
     return jsonify(person)
@@ -146,7 +146,7 @@ def get_person_detail(person_id):
 
 @explorer_bp.route('/api/explorer/person/<int:person_id>/full')
 def get_person_full(person_id):
-    loader = get_explorer_context().explorer_loader
+    loader = get_explorer_context().record_reader
     activities = loader.load_person_activities(person_id)
     if activities is None:
         return jsonify({'error': 'Person not found'}), 404
@@ -155,7 +155,7 @@ def get_person_full(person_id):
 
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/detail')
 def get_venue_detail(venue_id):
-    venue = get_explorer_context().explorer_loader.load_venue_detail(venue_id)
+    venue = get_explorer_context().record_reader.load_venue_detail(venue_id)
     if venue is None:
         return jsonify({'error': f'Venue {venue_id} not found'}), 404
     return jsonify(venue)
@@ -164,7 +164,7 @@ def get_venue_detail(venue_id):
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/locate')
 def locate_venue(venue_id):
     per_page = min(request.args.get('per_page', 20, type=int), 200)
-    result   = get_explorer_context().explorer_loader.locate_venue(venue_id, per_page)
+    result   = get_explorer_context().record_reader.locate_venue(venue_id, per_page)
     if result is None or result['geo_unit'] is None:
         return jsonify({'error': f'Venue {venue_id} not found'}), 404
     return jsonify(result)
@@ -173,7 +173,7 @@ def locate_venue(venue_id):
 @explorer_bp.route('/api/explorer/person/<int:person_id>/locate')
 def locate_person(person_id):
     per_page = min(request.args.get('per_page', 20, type=int), 200)
-    result   = get_explorer_context().explorer_loader.locate_person(person_id, per_page)
+    result   = get_explorer_context().record_reader.locate_person(person_id, per_page)
     if result is None or result['geo_unit'] is None:
         return jsonify({'error': f'Person {person_id} not found'}), 404
     return jsonify(result)
@@ -181,7 +181,7 @@ def locate_person(person_id):
 
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/children')
 def get_venue_children(venue_id):
-    loader   = get_explorer_context().explorer_loader
+    loader   = get_explorer_context().record_reader
     per_page = min(request.args.get('per_page', 20, type=int), 200)
     page     = max(1, request.args.get('page', 1, type=int))
     return jsonify(loader.load_venue_children(venue_id, page, per_page))
@@ -189,7 +189,7 @@ def get_venue_children(venue_id):
 
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/members')
 def get_venue_members(venue_id):
-    loader   = get_explorer_context().explorer_loader
+    loader   = get_explorer_context().record_reader
     per_page = min(request.args.get('per_page', 20, type=int), 200)
     page     = max(1, request.args.get('page', 1, type=int))
     result   = loader.load_venue_members(venue_id, page, per_page, request.args.get('subset'))

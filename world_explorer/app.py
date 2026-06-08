@@ -1,8 +1,8 @@
 """Flask factory for WorldExplorer.
 
-The explorer is decoupled from world_map on the data path: `world` is an
-ExplorerWorld (geography + aggregate stats + row indices only); people, venues
-and subsets are served on demand from HDF5 by ExplorerLoader. All routes live in
+The explorer is decoupled from world_map on the data path: `world` is a
+WorldStore (geography + aggregate stats + row indices only); people, venues
+and subsets are served on demand from HDF5 by RecordReader. All routes live in
 the bespoke explorer blueprint — none of world_map's eager-object blueprints are
 registered.
 """
@@ -21,30 +21,13 @@ def create_app(world, hdf5_path):
                 static_url_path='/static')
     CORS(app)
 
-    from world_reader.explorer_loader import ExplorerLoader
+    from world_reader import RecordReader
     from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
 
-    explorer_loader = ExplorerLoader(
-        hdf5_path,
-        world.person_id_to_idx,
-        world.subset_venue_ids,
-        world.geography,
-        world.subtree_index,
-        world.person_geo_unit_ids,
-        world.venue_geo_unit_ids,
-        world.venue_types_arr,
-        world.venue_type_names,
-        world.venue_list_position,
-        world.person_list_position,
-        world.venue_parent_ids,
-        world.venue_child_counts,
-        world.venue_child_total_members,
-        world.children_by_parent_sorted,
-        world.children_parent_ids_sorted,
-    )
+    record_reader = RecordReader(hdf5_path, world)
     app.config[_EXPLORER_CTX_KEY] = ExplorerContext(
         world=world,
-        explorer_loader=explorer_loader,
+        record_reader=record_reader,
     )
 
     from world_explorer.routes.explorer import explorer_bp

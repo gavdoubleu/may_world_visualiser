@@ -1,9 +1,9 @@
-"""Bespoke lazy loader for WorldExplorer.
+"""Lazy world store shared by WorldMap and WorldExplorer.
 
-Loads only what the explorer needs eagerly: the geography tree, aggregate
+Holds only what both apps need resident: the geography tree, aggregate
 statistics, and lightweight per-unit row indices. Person/Venue/Subset records
 are NOT materialised as Python objects — they are served on demand from HDF5 by
-ExplorerLoader. Contrast with world_map's eager in-memory object model.
+RecordReader.
 
 Reuses world_reader's shared load_geography and compute_unit_statistics;
 deliberately skips loading population / venues as Python objects, which would
@@ -21,7 +21,7 @@ from world_reader import compute_unit_statistics
 from world_reader.geography import load_geography
 from world_reader.statistics import compute_slim_statistics
 
-logger = logging.getLogger("explorer_world_loader")
+logger = logging.getLogger("world_store")
 
 
 class SubtreeIndex:
@@ -53,8 +53,8 @@ class SubtreeIndex:
         return self.venue_sorted_rows[start:end]
 
 
-class ExplorerWorld:
-    """Lightweight world for the explorer: geography + stats + indices only.
+class WorldStore:
+    """Lightweight resident world store: geography + stats + indices only.
 
     Holds `geography`, `_unit_statistics`, `_slim_statistics`. `population` /
     `venues` are intentionally absent — those are served lazily from HDF5.
@@ -89,7 +89,7 @@ class ExplorerWorld:
 
     def __str__(self):
         n_units = len(self.geography.units_by_id) if self.geography else 0
-        return f"<ExplorerWorld: {n_units} units (lazy people/venues)>"
+        return f"<WorldStore: {n_units} units (lazy people/venues)>"
 
 
 # ─── subtree index construction ───────────────────────────────────────────────
@@ -235,8 +235,8 @@ def _build_locate_indices(subtree_index, geography,
 
 # ─── public entry point ───────────────────────────────────────────────────────
 
-def load_explorer_world(input_file, compute_activity_stats: bool = False):
-    """Load an ExplorerWorld from world_state.h5 without materialising people/venues.
+def build_world_store(input_file, compute_activity_stats: bool = False):
+    """Build a WorldStore from world_state.h5 without materialising people/venues.
 
     Args:
         input_file: path to world_state.h5 (str or Path)
@@ -245,7 +245,7 @@ def load_explorer_world(input_file, compute_activity_stats: bool = False):
             of seconds). Live loads omit these (fast default); the static
             export needs them, so it loads with `True`.
     """
-    logger.info("Loading explorer world (lazy mode) from %s", input_file)
+    logger.info("Building world store (lazy mode) from %s", input_file)
     t_start = time.perf_counter()
 
     with h5py.File(input_file, 'r') as f:
@@ -317,7 +317,7 @@ def load_explorer_world(input_file, compute_activity_stats: bool = False):
         venue_parent_ids=venue_parent_ids,
     )
 
-    world = ExplorerWorld(
+    world = WorldStore(
         geography, slim_statistics, unit_statistics,
         person_id_to_idx, subset_venue_ids, subtree_index,
         person_geo_unit_ids, venue_geo_unit_ids, venue_types_arr,
@@ -328,6 +328,6 @@ def load_explorer_world(input_file, compute_activity_stats: bool = False):
         children_by_parent_sorted=children_by_parent_sorted,
         children_parent_ids_sorted=children_parent_ids_sorted,
     )
-    logger.info("Explorer world loaded in %.2fs: %s",
+    logger.info("World store built in %.2fs: %s",
                 time.perf_counter() - t_start, world)
     return world

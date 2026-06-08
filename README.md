@@ -104,21 +104,25 @@ may_world_visualiser/
 ├── docs/
 │   ├── adr/                 # architecture decision records
 │   └── world_explorer.md    # WorldExplorer architecture + API reference
-├── world_map/               # WorldMap package (eager in-memory model)
+├── world_reader/            # shared lazy HDF5 backend (WorldStore, RecordReader)
+│   ├── world_store.py       # build_world_store(), WorldStore, SubtreeIndex
+│   ├── record_reader.py     # on-demand HDF5 reads (RecordReader)
+│   ├── geography.py         # GeoUnit / GeographyManager / UnitStats
+│   └── statistics.py        # compute_unit_statistics() and friends
+├── world_map/               # WorldMap package (map-based visualisation)
 │   ├── app.py               # Flask factory create_app()
-│   ├── core/                # domain classes and HDF5 loader
 │   ├── routes/              # Flask blueprints (geography, population, venues, events)
 │   ├── events/              # event loading and analysis
 │   ├── themes/              # CSS theme generation
 │   └── yaml/                # config files (app_config, themes, panels, events)
-└── world_explorer/          # WorldExplorer package (lazy HDF5 backend)
+└── world_explorer/          # WorldExplorer package (file-explorer browser)
     ├── app.py               # Flask factory create_app()
-    ├── explorer_world_loader.py  # load_explorer_world(), SubtreeIndex
-    ├── explorer_loader.py   # on-demand HDF5 reads (ExplorerLoader)
     ├── context.py           # ExplorerContext
     └── routes/              # explorer_bp blueprint
 ```
 
 ## Data format
 
-World state is loaded from `.h5`/`.hdf5` files. WorldMap uses `world_map/core/world_loader.py`; WorldExplorer uses `world_explorer/explorer_world_loader.py`. Events are loaded from a separate `simulation_events.h5`.
+World state is loaded from `.h5`/`.hdf5` files via `world_reader.build_world_store()`,
+the single backend shared by WorldMap and WorldExplorer (see ADR 0002). Events are
+loaded from a separate `simulation_events.h5`.

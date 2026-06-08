@@ -29,7 +29,7 @@ def get_venue_types():
 def get_venues_by_type(venue_type):
     """Get all venues of a specific type as GeoJSON."""
     try:
-        venues = get_app_context().explorer_loader.load_venues_by_type(venue_type)
+        venues = get_app_context().record_reader.load_venues_by_type(venue_type)
 
         features = []
         for venue in venues:
@@ -63,14 +63,14 @@ def get_venues_by_type(venue_type):
 def get_venue_details(venue_id):
     """Get detailed information about a specific venue.
 
-    NOTE: `venue_id` here is the ExplorerLoader row index, not the logical
+    NOTE: `venue_id` here is the RecordReader row index, not the logical
     `venues/ids` value — a known pre-existing world_reader issue (silently
     correct only where venue IDs happen to be contiguous), inherited
     unchanged by this migration. See docs/handoff/fix-venue-id-semantics.md.
     """
     try:
         ctx = get_app_context()
-        venue = ctx.explorer_loader.load_venue_detail(venue_id)
+        venue = ctx.record_reader.load_venue_detail(venue_id)
         if venue is None:
             return jsonify({'error': f'Venue {venue_id} not found'}), 404
 
@@ -107,7 +107,7 @@ def get_world_statistics():
         ctx   = get_app_context()
         world = ctx.world
 
-        stats = ctx.explorer_loader.compute_population_statistics()
+        stats = ctx.record_reader.compute_population_statistics()
         if world.geography:
             stats['total_geo_units'] = len(world.geography.units_by_id)
             stats['geography_levels'] = world.geography.levels

@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-from world_reader.explorer_world import load_explorer_world
+from world_reader import build_world_store
 from world_explorer.app import create_app
 
 
@@ -42,7 +42,7 @@ Examples:
 
     print(f'Loading world from: {world_path}')
     try:
-        world = load_explorer_world(str(world_path))
+        world = build_world_store(str(world_path))
     except Exception as exc:
         print(f'\nERROR: failed to load world: {exc}\n')
         sys.exit(1)
