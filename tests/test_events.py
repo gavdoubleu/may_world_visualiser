@@ -1,10 +1,12 @@
 """Events route and EventAggregator tests."""
 
+import h5py
 import numpy as np
 import pytest
 
 from world_map.events.event_bundle import EventDataBundle
 from world_map.events.event_aggregator import EventAggregator
+from world_map.events.event_loader import load_events_with_world
 from world_map.testing import WorldBuilder
 
 
@@ -167,3 +169,52 @@ def test_aggregator_rate_method():
     assert 'rate' in result['0']
     # 2 infections / 100_000 * 100_000 = 2.0
     assert result['0']['rate'] == pytest.approx(2.0)
+
+
+# ---------------------------------------------------------------------------
+# load_events_with_world: geo coords + population sourced from resident store
+# Regression guard for the lazy-backend bug where population came from
+# unit.people (always empty) → rate always 0. (See architecture plan.)
+# ---------------------------------------------------------------------------
+
+def _write_events_h5(path, person_ids, times, person_geo_ids):
+    """Minimal events HDF5: one infections type + a people→geo lookup."""
+    ev_dt = np.dtype([('person_id', np.int32), ('time', np.float32)])
+    lk_dt = np.dtype([('person_id', np.int32), ('geo_unit_id', np.int32)])
+    with h5py.File(path, 'w') as f:
+        f.create_dataset('events/infections',
+                         data=np.array(list(zip(person_ids, times)), dtype=ev_dt))
+        f.create_dataset('lookups/people',
+                         data=np.array(list(zip(range(len(person_geo_ids)),
+                                                person_geo_ids)), dtype=lk_dt))
+
+
+def test_load_events_with_world_population_from_statistics(tmp_path):
+    # Leaf unit with 4 residents (persons 0-3 → geo_unit 0).
+    world = WorldBuilder().add_unit('A', population=4).build_world()
+    events_path = tmp_path / 'events.h5'
+    _write_events_h5(events_path, person_ids=[0, 1], times=[1.0, 2.0],
+                     person_geo_ids=[0, 0, 0, 0])
+
+    agg = load_events_with_world(str(events_path), world)
+
+    # Population is non-empty and matches the resident subtree-aggregated stats
+    # — the old unit.people path left this empty in lazy mode.
+    assert agg.geo_unit_population
+    assert agg.geo_unit_population[0] == world._unit_statistics['A'].population == 4
+    # Coords come straight from the geography tree.
+    assert agg.geo_unit_coords[0] == world.geography.units_by_id[0].coordinates
+
+
+def test_load_events_with_world_rate_nonzero(tmp_path):
+    """End-to-end: rate choropleth yields a real per-100k value, not 0."""
+    world = WorldBuilder().add_unit('A', population=4).build_world()
+    events_path = tmp_path / 'events.h5'
+    _write_events_h5(events_path, person_ids=[0, 1], times=[1.0, 2.0],
+                     person_geo_ids=[0, 0, 0, 0])
+
+    agg = load_events_with_world(str(events_path), world)
+    result = agg.aggregated('infections', 0.0, 10.0, method='rate')
+
+    # 2 infections / 4 residents * 100_000 = 50_000.
+    assert result['0']['rate'] == pytest.approx(50_000.0)

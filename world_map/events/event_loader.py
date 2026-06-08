@@ -60,17 +60,25 @@ def load_event_aggregator(
 
 
 def load_events_with_world(events_path: str, world=None) -> EventAggregator:
-    """Backward-compatible wrapper. Extracts geo data from world, returns EventAggregator."""
+    """Production EventAggregator factory: pull geo coords + population from a
+    resident WorldStore, read events HDF5, return a ready aggregator.
+
+    Coords and population both come from already-resident state — coordinates
+    from the geography tree, population from the subtree-aggregated
+    `_unit_statistics` (the lazy backend never materialises `GeoUnit.people`,
+    so the old `get_people()` count was always empty → rate always 0).
+    """
     coords: dict[int, tuple[float, float]] = {}
     population: dict[int, int] = {}
 
     if world and world.geography:
-        for level in world.geography.levels:
-            for unit in world.geography.get_units_by_level(level).values():
-                if unit.coordinates:
-                    coords[unit.id] = unit.coordinates
-                if unit.people:
-                    population[unit.id] = len(unit.get_people())
+        coords = world.geography.geo_unit_coords()
+        unit_statistics = getattr(world, '_unit_statistics', None) or {}
+        population = {
+            unit.id: unit_statistics[unit.name].population
+            for unit in world.geography.units_by_id.values()
+            if unit.name in unit_statistics
+        }
 
     aggregator = load_event_aggregator(events_path, coords, population)
     logger.info(f"Set {len(coords)} geo_unit coordinates from world")
@@ -87,7 +95,10 @@ def _read_and_sort_events(
     """Discover event types from 'events/' group, load and sort each."""
     events_sorted: dict[str, np.ndarray] = {}
     events_times: dict[str, np.ndarray] = {}
-    all_times: list = []
+    # Each sorted array is time-ascending, so its first/last element bound that
+    # type — collect per-type endpoints rather than materialising every time.
+    type_mins: list[float] = []
+    type_maxes: list[float] = []
 
     if 'events' not in f:
         return events_sorted, events_times, 0.0, 0.0
@@ -102,60 +113,65 @@ def _read_and_sort_events(
 
         sort_idx = np.argsort(data['time'], kind='stable')
         sorted_arr = data[sort_idx]
+        sorted_times = sorted_arr['time']
         events_sorted[event_type] = sorted_arr
-        events_times[event_type] = sorted_arr['time'].astype(np.float32)
+        events_times[event_type] = sorted_times.astype(np.float32)
         logger.info(f"  Loaded {len(data)} {event_type}")
 
-        if 'time' in data.dtype.names:
-            all_times.extend(data['time'])
+        type_mins.append(float(sorted_times[0]))
+        type_maxes.append(float(sorted_times[-1]))
 
-    time_min = float(min(all_times)) if all_times else 0.0
-    time_max = float(max(all_times)) if all_times else 0.0
-    if all_times:
+    time_min = min(type_mins) if type_mins else 0.0
+    time_max = max(type_maxes) if type_maxes else 0.0
+    if type_mins:
         logger.info(f"  Time range: {time_min:.1f} - {time_max:.1f}")
 
     return events_sorted, events_times, time_min, time_max
 
 
+def _read_lookup_columns(
+    f: h5py.File, group: str, id_field: str,
+) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+    """Read an id→geo_unit lookup table as two int32 columns (no per-row loop)."""
+    if group not in f:
+        return None, None
+    rows = f[group][:]
+    ids   = rows[id_field].astype(np.int32)
+    geos  = rows['geo_unit_id'].astype(np.int32)
+    logger.info(f"  Loaded {len(ids)} {group} mappings")
+    return ids, geos
+
+
+def _scatter_dense(ids: Optional[np.ndarray], geos: Optional[np.ndarray],
+                   label: str) -> Optional[np.ndarray]:
+    """Scatter (id, geo) columns into a dense -1-filled int32 lookup array."""
+    if ids is None or len(ids) == 0:
+        return None
+    max_id = int(ids.max())
+    if max_id >= _MAX_ARRAY_ID:
+        return None
+    dense = np.full(max_id + 1, -1, dtype=np.int32)
+    dense[ids] = geos
+    logger.info(f"  Built {label} lookup array (size {max_id + 1:,})")
+    return dense
+
+
 def _build_lookup_arrays(
     f: h5py.File,
 ) -> tuple[Optional[np.ndarray], Optional[np.ndarray], int]:
-    """Build dense int32 lookup arrays from HDF5 lookup tables."""
-    venue_to_geo: dict[int, int] = {}
-    person_to_geo: dict[int, int] = {}
+    """Build dense int32 lookup arrays from HDF5 lookup tables.
 
-    if 'lookups/venues' in f:
-        for row in f['lookups/venues'][:]:
-            venue_to_geo[int(row['venue_id'])] = int(row['geo_unit_id'])
-        logger.info(f"  Loaded {len(venue_to_geo)} venue mappings")
+    Vectorised column reads + scatter — no per-row Python loop over the
+    (potentially multi-million-row) lookup tables.
+    """
+    venue_ids, venue_geos   = _read_lookup_columns(f, 'lookups/venues', 'venue_id')
+    person_ids, person_geos = _read_lookup_columns(f, 'lookups/people', 'person_id')
 
-    if 'lookups/people' in f:
-        for row in f['lookups/people'][:]:
-            person_to_geo[int(row['person_id'])] = int(row['geo_unit_id'])
-        logger.info(f"  Loaded {len(person_to_geo)} person mappings")
+    venue_geo_array  = _scatter_dense(venue_ids, venue_geos, 'venue')
+    person_geo_array = _scatter_dense(person_ids, person_geos, 'person')
 
-    venue_geo_array: Optional[np.ndarray] = None
-    person_geo_array: Optional[np.ndarray] = None
-
-    if venue_to_geo:
-        vids = np.array(list(venue_to_geo.keys()), dtype=np.int32)
-        vgeos = np.array(list(venue_to_geo.values()), dtype=np.int32)
-        max_vid = int(vids.max())
-        if max_vid < _MAX_ARRAY_ID:
-            venue_geo_array = np.full(max_vid + 1, -1, dtype=np.int32)
-            venue_geo_array[vids] = vgeos
-            logger.info(f"  Built venue lookup array (size {max_vid + 1:,})")
-
-    if person_to_geo:
-        pids = np.array(list(person_to_geo.keys()), dtype=np.int32)
-        pgeos = np.array(list(person_to_geo.values()), dtype=np.int32)
-        max_pid = int(pids.max())
-        if max_pid < _MAX_ARRAY_ID:
-            person_geo_array = np.full(max_pid + 1, -1, dtype=np.int32)
-            person_geo_array[pids] = pgeos
-            logger.info(f"  Built person lookup array (size {max_pid + 1:,})")
-
-    all_geos = set(venue_to_geo.values()) | set(person_to_geo.values())
-    n_geo = int(max(all_geos)) + 1 if all_geos else 1
+    geo_maxes = [int(geos.max()) for geos in (venue_geos, person_geos)
+                 if geos is not None and len(geos)]
+    n_geo = max(geo_maxes) + 1 if geo_maxes else 1
 
     return venue_geo_array, person_geo_array, n_geo

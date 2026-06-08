@@ -99,6 +99,19 @@ class GeographyManager:
     def get_units_by_level(self, level):
         return self._units_by_level.get(level, {})
 
+    def geo_unit_coords(self) -> dict[int, tuple[float, float]]:
+        """{unit_id: (lat, lon)} for every unit carrying coordinates.
+
+        Single source of truth for "all units with coordinates" — shared by
+        WorldMap projection seeding and event geo-aggregation. Flat O(units)
+        pass over units_by_id (replaces the per-level nested iteration idiom).
+        """
+        return {
+            unit.id: unit.coordinates
+            for unit in self.units_by_id.values()
+            if unit.coordinates
+        }
+
 
 def load_geography(geo_group, geo_names=None, level_registry=None):
     """Reconstruct GeographyManager from HDF5 geography group."""

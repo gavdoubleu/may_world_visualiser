@@ -66,12 +66,7 @@ def create_app(world, hdf5_path, map_config=None, config_path=None):
         _projection = WebMercatorConfig()
 
     if world.geography:
-        _all_coords = [
-            unit.coordinates
-            for level in world.geography.levels
-            for unit in world.geography.get_units_by_level(level).values()
-            if unit.coordinates
-        ]
+        _all_coords = world.geography.geo_unit_coords().values()
         if _all_coords:
             _lats, _lons = zip(*_all_coords)
             _projection.seed_from_coordinates(list(_lats), list(_lons))
