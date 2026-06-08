@@ -51,13 +51,11 @@ def person_activities_h5(tmp_path):
 
 @pytest.fixture
 def loader(person_activities_h5):
-    # person_id_to_idx: id5→idx0, id3→idx1 (array size must cover max id=5)
-    person_id_to_idx = np.full(6, -1, dtype=np.int64)
-    person_id_to_idx[5] = 0
-    person_id_to_idx[3] = 1
+    # population/ids in row order: id=5 at row 0, id=3 at row 1
+    person_ids_in_row_order = np.array([5, 3], dtype=np.int64)
     subset_venue_ids = np.array([0], dtype=np.int64)
     world = (WorldBuilder()
-             .with_person_id_to_idx(person_id_to_idx)
+             .with_person_id_to_idx(person_ids_in_row_order)
              .with_subset_venue_ids(subset_venue_ids)
              .build_world())
     return RecordReader(person_activities_h5, world)

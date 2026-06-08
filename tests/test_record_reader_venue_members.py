@@ -43,12 +43,14 @@ def venue_members_h5(tmp_path):
 @pytest.fixture
 def explorer_client(venue_members_h5):
     """Flask test client with explorer_bp and ExplorerContext set up."""
-    # PERSON_ID_TO_IDX: id0→idx1, id1→idx2, id2→idx0
-    person_id_to_idx  = np.array([1, 2, 0], dtype=np.int64)
+    # population/ids in row order (matches venue_members_h5: [id=2, id=0, id=1])
+    person_ids_in_row_order = np.array([2, 0, 1], dtype=np.int64)
     subset_venue_ids  = np.array([0], dtype=np.int64)
+    venue_ids_in_row_order = np.array([0], dtype=np.int64)  # single venue, logical id 0
     world  = (WorldBuilder()
-              .with_person_id_to_idx(person_id_to_idx)
+              .with_person_id_to_idx(person_ids_in_row_order)
               .with_subset_venue_ids(subset_venue_ids)
+              .with_venue_id_to_idx(venue_ids_in_row_order)
               .build_world())
     loader = RecordReader(venue_members_h5, world)
 

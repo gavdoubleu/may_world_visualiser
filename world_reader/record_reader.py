@@ -4,6 +4,7 @@ import h5py
 import numpy as np
 
 from world_reader.convert import SEX_DECODE, decode_str
+from world_reader.id_index import IdIndex
 from world_reader.pagination import calc_total_pages
 from world_reader.statistics import (
     compute_population_statistics as _compute_population_statistics,
@@ -18,6 +19,8 @@ class RecordReader:
         self._hdf5_path = str(hdf5_path)
         self._person_id_to_idx    = store.person_id_to_idx
         self._subset_venue_ids    = store.subset_venue_ids
+        self._venue_ids           = store.venue_ids
+        self._venue_id_to_idx     = store.venue_id_to_idx
         self._geography           = store.geography
         self._subtree_index       = store.subtree_index
         self._person_geo_unit_ids = store.person_geo_unit_ids
@@ -34,12 +37,11 @@ class RecordReader:
 
     def load_person_activities(self, person_id: int) -> list[dict] | None:
         """Return ActivityMap records for person_id, or None if not found."""
-        if (self._person_id_to_idx is None
-                or person_id < 0
-                or person_id >= len(self._person_id_to_idx)):
+        if self._person_id_to_idx is None:
             return None
-
         person_array_idx = int(self._person_id_to_idx[person_id])
+        if person_array_idx == IdIndex.MISSING:
+            return None
 
         with h5py.File(self._hdf5_path, 'r') as f:
             offsets  = f['activity_mappings/activity_map/activity_offsets']
@@ -96,15 +98,19 @@ class RecordReader:
 
     def load_venue_members(self, venue_id: int, page: int, per_page: int,
                            subset_filter: str | None) -> dict:
-        """Return paginated Subset member lists for a Venue."""
-        first_sub = int(np.searchsorted(self._subset_venue_ids, venue_id, side='left'))
-        last_sub  = int(np.searchsorted(self._subset_venue_ids, venue_id, side='right'))
+        """Return paginated Subset member lists for a Venue (venue_id is logical)."""
+        row = int(self._venue_id_to_idx[venue_id])
+        if row == IdIndex.MISSING:
+            return {'venue_id': venue_id, 'venue_name': str(venue_id), 'subsets': []}
+
+        first_sub = int(np.searchsorted(self._subset_venue_ids, row, side='left'))
+        last_sub  = int(np.searchsorted(self._subset_venue_ids, row, side='right'))
 
         if first_sub >= last_sub:
             return {'venue_id': venue_id, 'venue_name': str(venue_id), 'subsets': []}
 
         with h5py.File(self._hdf5_path, 'r') as f:
-            venue_name       = decode_str(f['metadata/names/venues'][venue_id])
+            venue_name       = decode_str(f['metadata/names/venues'][row])
             subset_names_arr = f['metadata/names/subsets']
             members_offsets  = f['venues/subsets/members_offsets']
             members_flat     = f['venues/subsets/members_flat']
@@ -198,12 +204,11 @@ class RecordReader:
         Activities are loaded separately via load_person_activities — matching the
         slim-mode person panel, which lazily fetches activities on demand.
         """
-        if (self._person_id_to_idx is None
-                or person_id < 0
-                or person_id >= len(self._person_id_to_idx)):
+        if self._person_id_to_idx is None:
             return None
-
         array_idx = int(self._person_id_to_idx[person_id])
+        if array_idx == IdIndex.MISSING:
+            return None
 
         with h5py.File(self._hdf5_path, 'r') as f:
             age    = int(f['population/ages'][array_idx])
@@ -304,7 +309,7 @@ class RecordReader:
                                            if self._venue_child_total_members is not None
                                            else 0)
                     venues.append({
-                        'id': int(venue_id),
+                        'id': int(self._venue_ids[venue_id]),
                         'name': decode_str(name_b),
                         'type': (type_names[int(type_code)]
                                  if int(type_code) < len(type_names) else 'unknown'),
@@ -348,7 +353,7 @@ class RecordReader:
                     continue
                 subsets = self._venue_subsets(f, int(venue_id))
                 venues.append({
-                    'id': int(venue_id),
+                    'id': int(self._venue_ids[venue_id]),
                     'name': decode_str(name_b),
                     'type': venue_type,
                     'geo_unit': self._unit_name(int(geo_id)),
@@ -359,24 +364,25 @@ class RecordReader:
         return venues
 
     def load_venue_detail(self, venue_id: int) -> dict | None:
-        """Single venue detail (venue_id is a direct array row) plus its subsets."""
+        """Single venue detail by logical venue ID (venues/ids), plus its subsets."""
+        row = int(self._venue_id_to_idx[venue_id])
+        if row == IdIndex.MISSING:
+            return None
         with h5py.File(self._hdf5_path, 'r') as f:
-            if venue_id < 0 or venue_id >= f['venues/ids'].shape[0]:
-                return None
             type_names = self._venue_type_names(f)
-            type_code  = int(f['venues/types'][venue_id])
-            lat        = float(f['venues/latitudes'][venue_id])
-            lon        = float(f['venues/longitudes'][venue_id])
-            geo_id     = int(f['venues/geo_unit_ids'][venue_id])
+            type_code  = int(f['venues/types'][row])
+            lat        = float(f['venues/latitudes'][row])
+            lon        = float(f['venues/longitudes'][row])
+            geo_id     = int(f['venues/geo_unit_ids'][row])
             return {
-                'id': venue_id,
-                'name': decode_str(f['metadata/names/venues'][venue_id]),
+                'id': int(self._venue_ids[row]),
+                'name': decode_str(f['metadata/names/venues'][row]),
                 'type': (type_names[type_code]
                          if type_code < len(type_names) else 'unknown'),
                 'geo_unit': self._unit_name(geo_id),
                 'coordinates': (None if np.isnan(lat) else [lat, lon]),
-                'properties': self._venue_properties(f, venue_id),
-                'subsets': self._venue_subsets(f, venue_id),
+                'properties': self._venue_properties(f, row),
+                'subsets': self._venue_subsets(f, row),
             }
 
     def load_venue_children(self, venue_id: int, page: int, per_page: int) -> dict:
@@ -388,8 +394,12 @@ class RecordReader:
                 or self._children_parent_ids_sorted is None):
             return empty
 
-        first = int(np.searchsorted(self._children_parent_ids_sorted, venue_id, side='left'))
-        last  = int(np.searchsorted(self._children_parent_ids_sorted, venue_id, side='right'))
+        parent_row = int(self._venue_id_to_idx[venue_id])
+        if parent_row == IdIndex.MISSING:
+            return empty
+
+        first = int(np.searchsorted(self._children_parent_ids_sorted, parent_row, side='left'))
+        last  = int(np.searchsorted(self._children_parent_ids_sorted, parent_row, side='right'))
         if first >= last:
             return empty
 
@@ -410,7 +420,7 @@ class RecordReader:
                 for venue_row, name_b, type_code, lat, lon, geo_id in zip(
                         idx, names, types, lats, lons, geo_ids):
                     venues.append({
-                        'id': int(venue_row),
+                        'id': int(self._venue_ids[venue_row]),
                         'name': decode_str(name_b),
                         'type': (type_names[int(type_code)]
                                  if int(type_code) < len(type_names) else 'unknown'),
@@ -435,16 +445,17 @@ class RecordReader:
 
     def locate_venue(self, venue_id: int, per_page: int) -> dict | None:
         """Return {geo_unit, venue_type, page} for venue_id, or None if invalid."""
-        if (self._venue_geo_unit_ids is None
-                or venue_id < 0
-                or venue_id >= len(self._venue_geo_unit_ids)):
+        if self._venue_geo_unit_ids is None or self._venue_id_to_idx is None:
             return None
-        geo_id     = int(self._venue_geo_unit_ids[venue_id])
+        row = int(self._venue_id_to_idx[venue_id])
+        if row == IdIndex.MISSING:
+            return None
+        geo_id     = int(self._venue_geo_unit_ids[row])
         unit       = self._geography.units_by_id.get(geo_id)
-        type_code  = int(self._venue_types_arr[venue_id])
+        type_code  = int(self._venue_types_arr[row])
         venue_type = (self._venue_type_names_cache[type_code]
                       if type_code < len(self._venue_type_names_cache) else 'unknown')
-        position   = int(self._venue_list_position[venue_id])
+        position   = int(self._venue_list_position[row])
         return {
             'geo_unit':   unit.name if unit else None,
             'venue_type': venue_type,
@@ -453,12 +464,11 @@ class RecordReader:
 
     def locate_person(self, person_id: int, per_page: int) -> dict | None:
         """Return {geo_unit, page} for person_id, or None if invalid."""
-        if (self._person_geo_unit_ids is None
-                or self._person_id_to_idx is None
-                or person_id < 0
-                or person_id >= len(self._person_id_to_idx)):
+        if self._person_geo_unit_ids is None or self._person_id_to_idx is None:
             return None
         array_idx = int(self._person_id_to_idx[person_id])
+        if array_idx == IdIndex.MISSING:
+            return None
         geo_id    = int(self._person_geo_unit_ids[array_idx])
         unit      = self._geography.units_by_id.get(geo_id)
         position  = int(self._person_list_position[array_idx])
