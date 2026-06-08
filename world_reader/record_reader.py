@@ -63,20 +63,20 @@ class RecordReader:
             activities = []
             for row in act_data:
                 act_type_idx = int(row[1])
-                venue_id     = int(row[2])
+                venue_row    = int(row[2])
                 subset_pos   = int(row[3])
 
                 act_name   = decode_str(act_names[act_type_idx])
-                venue_name = decode_str(venue_names[venue_id])
-                vtype_idx  = int(venue_types[venue_id])
+                venue_name = decode_str(venue_names[venue_row])
+                vtype_idx  = int(venue_types[venue_row])
                 venue_type = venue_type_names[vtype_idx] if vtype_idx < len(venue_type_names) else 'unknown'
 
-                venue_geo_id  = int(venue_geo_ids[venue_id])
+                venue_geo_id  = int(venue_geo_ids[venue_row])
                 venue_unit    = self._geography.units_by_id.get(venue_geo_id)
                 venue_geo_unit = venue_unit.name if venue_unit else str(venue_geo_id)
 
-                first_sub = int(np.searchsorted(self._subset_venue_ids, venue_id, side='left'))
-                last_sub  = int(np.searchsorted(self._subset_venue_ids, venue_id, side='right'))
+                first_sub = int(np.searchsorted(self._subset_venue_ids, venue_row, side='left'))
+                last_sub  = int(np.searchsorted(self._subset_venue_ids, venue_row, side='right'))
                 if first_sub < last_sub:
                     subset_row  = first_sub + subset_pos
                     subset_name = decode_str(subset_names[subset_row])
@@ -85,7 +85,7 @@ class RecordReader:
 
                 activities.append({
                     'activity_name':  act_name,
-                    'venue_id':       venue_id,
+                    'venue_id':       int(self._venue_ids[venue_row]),
                     'venue_name':     venue_name,
                     'venue_type':     venue_type,
                     'venue_geo_unit': venue_geo_unit,

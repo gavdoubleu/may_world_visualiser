@@ -13,9 +13,12 @@ def person_activities_h5(tmp_path):
     """Minimal HDF5 for testing load_person_activities.
 
     Two people: id=5 at array index 0, id=3 at array index 1.
-    Person id=5 has one activity: act_type=0 ('work'), venue=0 ('office'),
-      subset_pos=0 ('desk'), venue geo_unit=10.
+    Person id=5 has one activity: act_type=0 ('work'), venue row=0
+      (logical venue id=7, 'office'), subset_pos=0 ('desk'), venue geo_unit=10.
     Person id=3 has no activities.
+
+    Logical venue id (7) deliberately differs from its row index (0), so a
+    test that asserts on the logical id catches row-index leaks.
     """
     h5_path = tmp_path / 'activities_test.h5'
     with h5py.File(h5_path, 'w') as f:
@@ -42,6 +45,8 @@ def person_activities_h5(tmp_path):
                          data=np.array([0], dtype=np.int32))
         f.create_dataset('venues/geo_unit_ids',
                          data=np.array([10], dtype=np.int32))
+        f.create_dataset('venues/ids',
+                         data=np.array([7], dtype=np.int32))
 
         # subset venue mapping: venue 0 has one subset at row 0
         f.create_dataset('venues/subsets/venue_ids',
@@ -54,9 +59,11 @@ def loader(person_activities_h5):
     # population/ids in row order: id=5 at row 0, id=3 at row 1
     person_ids_in_row_order = np.array([5, 3], dtype=np.int64)
     subset_venue_ids = np.array([0], dtype=np.int64)
+    venue_ids_in_row_order = np.array([7], dtype=np.int64)
     world = (WorldBuilder()
              .with_person_id_to_idx(person_ids_in_row_order)
              .with_subset_venue_ids(subset_venue_ids)
+             .with_venue_id_to_idx(venue_ids_in_row_order)
              .build_world())
     return RecordReader(person_activities_h5, world)
 
@@ -67,7 +74,7 @@ def test_load_person_activities_returns_correct_record(loader):
     assert len(activities) == 1
     act = activities[0]
     assert act['activity_name'] == 'work'
-    assert act['venue_id']      == 0
+    assert act['venue_id']      == 7  # logical id (venues/ids), not row index
     assert act['venue_name']    == 'office'
     assert act['venue_type']    == 'workplace'
     assert act['subset_name']   == 'desk'
