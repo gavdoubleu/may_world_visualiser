@@ -8,6 +8,8 @@ from pathlib import Path
 
 import yaml
 
+from webapp_utilities.theme_css import resolve_theme
+
 logger = logging.getLogger(__name__)
 
 _BUILTIN_THEMES_DIR = Path(__file__).parent / 'yaml' / 'themes'
@@ -37,7 +39,9 @@ class AppConfig:
         if events is None:
             raise KeyError(f"'events' section missing from {config_path}")
 
-        theme = _load_theme(cfg.get('theme', 'dark_scientific'), config_path)
+        theme_ref = cfg.get('theme', 'dark_scientific')
+        theme = resolve_theme(theme_ref, _BUILTIN_THEMES_DIR, config_path.parent)
+        logger.info(f"Loaded theme '{theme_ref}'")
 
         geo_unit_names = _load_geo_unit_names(cfg.get('geo_unit_names', {}), config_path.parent)
 
@@ -65,22 +69,6 @@ class AppConfig:
             projection_type='web_mercator',
             projection_kwargs={},
         )
-
-
-def _load_theme(theme_ref: str, config_path: Path) -> dict:
-    """Resolve theme_ref to a YAML file and load it.
-
-    theme_ref is either a built-in name ('dark_scientific') or a path
-    relative to config_path's directory ('./my_theme.yaml').
-    """
-    if theme_ref.endswith('.yaml') or '/' in theme_ref or '\\' in theme_ref:
-        theme_path = config_path.parent / theme_ref
-    else:
-        theme_path = _BUILTIN_THEMES_DIR / f'{theme_ref}.yaml'
-    with open(theme_path) as f:
-        theme = yaml.safe_load(f) or {}
-    logger.info(f"Loaded theme '{theme_ref}'")
-    return theme
 
 
 def _load_geo_unit_names(geo_cfg: dict, config_dir: Path) -> dict[str, str] | None:

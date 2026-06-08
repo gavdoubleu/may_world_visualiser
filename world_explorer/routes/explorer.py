@@ -3,21 +3,18 @@
 import logging
 from pathlib import Path
 
-import yaml
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
 from world_explorer.context import get_explorer_context
-from world_map.themes.theme_css import build_root_block
+from webapp_utilities.theme_css import render_theme_css
 from world_map.utils import convert_numpy_types
 
 logger = logging.getLogger(__name__)
 
 explorer_bp = Blueprint('explorer', __name__)
 
-_THEMES_DIR    = Path(__file__).parent.parent.parent / 'world_map' / 'yaml' / 'themes'
-_FONTS_DIR     = Path(__file__).parent.parent.parent / 'world_map' / 'static' / 'fonts'
-_IMAGES_DIR    = Path(__file__).parent.parent / 'images'
-_DEFAULT_THEME = 'dark_scientific'
+_FONTS_DIR  = Path(__file__).parent.parent.parent / 'world_map' / 'static' / 'fonts'
+_IMAGES_DIR = Path(__file__).parent.parent / 'images'
 
 
 @explorer_bp.route('/')
@@ -27,11 +24,7 @@ def index():
 
 @explorer_bp.route('/theme.css')
 def theme_css():
-    theme_path = _THEMES_DIR / f'{_DEFAULT_THEME}.yaml'
-    with open(theme_path) as f:
-        theme_config = yaml.safe_load(f) or {}
-    css = build_root_block(theme_config)
-    return Response(css, mimetype='text/css')
+    return Response(render_theme_css(get_explorer_context().theme), mimetype='text/css')
 
 
 @explorer_bp.route('/wm-fonts/<path:filename>')

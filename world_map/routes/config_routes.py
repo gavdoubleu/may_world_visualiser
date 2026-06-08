@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify, render_template
 import logging
 
-from world_map.themes.theme_css import build_root_block
+from webapp_utilities.theme_css import render_theme_css
 from world_map.context import get_app_context
 
 logger = logging.getLogger(__name__)
@@ -50,38 +50,8 @@ def get_theme_css():
     """Return a CSS stylesheet generated from the active theme config."""
     from flask import current_app
     theme = get_app_context().app_config.theme or {}
-    fonts = theme.get('fonts', {})
-
-    display_font = fonts.get('display', 'sans-serif')
-    body_font = fonts.get('body', 'sans-serif')
-    display_file = fonts.get('display_file', '')
-    body_file = fonts.get('body_file', '')
-
-    css_lines = []
-
-    if display_file:
-        css_lines.append(
-            f"@font-face {{\n"
-            f"    font-family: '{display_font}';\n"
-            f"    src: url('/static/fonts/{display_file}') format('woff2');\n"
-            f"    font-weight: normal;\n"
-            f"    font-style: normal;\n"
-            f"}}"
-        )
-    if body_file and body_file != display_file:
-        css_lines.append(
-            f"@font-face {{\n"
-            f"    font-family: '{body_font}';\n"
-            f"    src: url('/static/fonts/{body_file}') format('woff2');\n"
-            f"    font-weight: normal;\n"
-            f"    font-style: normal;\n"
-            f"}}"
-        )
-
-    css_lines.append(build_root_block(theme))
-
     return current_app.response_class(
-        response="\n\n".join(css_lines),
+        response=render_theme_css(theme),
         status=200,
         mimetype='text/css'
     )

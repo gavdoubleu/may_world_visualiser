@@ -52,7 +52,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 WORLD_MAP_DIR = Path(__file__).parent.resolve() / 'world_map'
 
-from world_map.themes.theme_css import build_root_block
+from webapp_utilities.theme_css import build_root_block
 from world_reader import build_world_store
 
 LEAFLET_VERSION = '1.9.4'

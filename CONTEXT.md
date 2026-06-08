@@ -38,5 +38,7 @@ File-explorer-style browser interface for inspecting a world file. Left pane sho
 
 Both WorldMap and WorldExplorer run on the same shared lazy backend in `world_reader/` (`WorldStore` + `RecordReader`): neither materialises Person, Venue or Subset as in-memory objects. Only the GeoUnit hierarchy and aggregate UnitStats are held resident; individual Person/Venue/Subset records are served on demand from HDF5. See ADR 0002.
 
+Pagination follows two intentional patterns: routes/tests holding a fully materialised list use `paginate`/`PaginationSlice` (`world_reader/pagination.py`); `RecordReader` hand-slices numpy arrays/HDF5 datasets directly (reusing only `calc_total_pages`) so it never has to materialise a full array just to re-slice it.
+
 **Detail Panel**
 The slide-in panel on the right edge of WorldExplorer. Displays full detail for a single domain object (Person or Venue). For a Person: id, age, sex, geo_unit, properties, and activity map. For a Venue: name, type, geo_unit, coordinates, properties, and member list (paginated by Subset). Panel history supports back/forward navigation.

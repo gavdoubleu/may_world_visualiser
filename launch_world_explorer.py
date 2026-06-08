@@ -29,6 +29,9 @@ Examples:
                         help='Port (default: 5001)')
     parser.add_argument('--debug', action='store_true',
                         help='Flask debug mode')
+    parser.add_argument('--theme', type=str, default=None,
+                        help='Built-in theme name, e.g. dark_scientific, clean_minimal '
+                             '(default: dark_scientific)')
 
     args = parser.parse_args()
 
@@ -47,7 +50,7 @@ Examples:
         print(f'\nERROR: failed to load world: {exc}\n')
         sys.exit(1)
 
-    app = create_app(world, world_path)
+    app = create_app(world, world_path, theme=args.theme)
 
     print(f'\n{"=" * 50}')
     print('  WorldExplorer')
