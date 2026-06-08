@@ -1,6 +1,6 @@
 """Domain model tests for UnitStats — no Flask, no HDF5."""
 
-from world_map.core.world_data import UnitStats, AGE_LABELS
+from world_reader.geography import UnitStats, AGE_LABELS
 from world_map.testing import WorldBuilder
 
 

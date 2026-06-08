@@ -56,9 +56,8 @@ class SubtreeIndex:
 class ExplorerWorld:
     """Lightweight world for the explorer: geography + stats + indices only.
 
-    Duck-compatible with the subset of WorldData the explorer routes touch
-    (`geography`, `_unit_statistics`, `_slim_statistics`). `population` / `venues`
-    are intentionally absent — those are served lazily from HDF5.
+    Holds `geography`, `_unit_statistics`, `_slim_statistics`. `population` /
+    `venues` are intentionally absent — those are served lazily from HDF5.
     """
 
     def __init__(self, geography, slim_statistics, unit_statistics,
