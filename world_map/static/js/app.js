@@ -338,56 +338,7 @@ function displayWorldStats(stats) {
         `;
     }
 
-    if (stats.slim_statistics) {
-        html += buildSlimStatsHtml(stats.slim_statistics);
-    }
-
     statsEl.innerHTML = html;
-}
-
-function buildSlimStatsHtml(slim) {
-    let html = '';
-
-    // Activity map breakdown
-    if (slim.activity_map) {
-        const am = slim.activity_map;
-        html += `<div class="stat-item" style="flex-direction:column;align-items:flex-start;gap:4px;padding-bottom:8px;">
-            <span class="stat-label" style="font-weight:600;margin-bottom:4px;">Activities</span>`;
-        if (am.avg_contacts_estimate != null) {
-            html += `<div style="display:flex;justify-content:space-between;width:100%;">
-                <span class="stat-label">Est. avg contacts/person</span>
-                <span class="stat-value">${am.avg_contacts_estimate.toLocaleString()}</span>
-            </div>`;
-        }
-        if (am.avg_activity_types_per_person != null) {
-            html += `<div style="display:flex;justify-content:space-between;width:100%;">
-                <span class="stat-label">Avg activity types</span>
-                <span class="stat-value">${am.avg_activity_types_per_person}</span>
-            </div>`;
-        }
-        if (am.avg_venue_assignments_per_person != null) {
-            html += `<div style="display:flex;justify-content:space-between;width:100%;">
-                <span class="stat-label">Avg venue assignments</span>
-                <span class="stat-value">${am.avg_venue_assignments_per_person}</span>
-            </div>`;
-        }
-        if (am.activity_counts) {
-            const entries = Object.entries(am.activity_counts).sort((a, b) => b[1] - a[1]);
-            html += `<div style="margin-top:4px;width:100%;max-height:150px;overflow-y:auto;">`;
-            for (const [name, count] of entries) {
-                const pct = am.total_people_with_activities > 0
-                    ? Math.round(100 * count / am.total_people_with_activities) : 0;
-                html += `<div style="display:flex;justify-content:space-between;width:100%;font-size:0.8rem;">
-                    <span class="stat-label">${name}</span>
-                    <span class="stat-value">${count.toLocaleString()} (${pct}%)</span>
-                </div>`;
-            }
-            html += `</div>`;
-        }
-        html += `</div>`;
-    }
-
-    return html;
 }
 
 // =============================================================================
@@ -967,30 +918,7 @@ function buildDefaultGeoUnitPanel(unit) {
     }
 
     if (unit.slim_mode) {
-        // Slim mode: show activity breakdown instead of a people list
-        if (unit.activity_counts && Object.keys(unit.activity_counts).length > 0) {
-            const maxAct = Math.max(...Object.values(unit.activity_counts));
-            html += `
-                <h3>Activity Breakdown</h3>
-                <div class="bar-chart">
-                    ${Object.entries(unit.activity_counts)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([act, count]) => {
-                            const pct = unit.population > 0
-                                ? (100 * count / unit.population).toFixed(1) : '0';
-                            return `
-                                <div class="bar-item">
-                                    <div class="bar-label">${act}</div>
-                                    <div class="bar-wrapper">
-                                        <div class="bar-fill" style="width: ${count / maxAct * 100}%"></div>
-                                    </div>
-                                    <div class="bar-value">${count.toLocaleString()} (${pct}%)</div>
-                                </div>
-                            `;
-                        }).join('')}
-                </div>
-            `;
-        }
+        // Activity breakdown deferred to on-demand stats (see docs/handoff/activity-stats-on-demand.md)
     } else {
         // Full mode: show venue list (first 50) and "View People" button
         if (unit.venue_details && unit.venue_details.length > 0) {

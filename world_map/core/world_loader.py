@@ -24,11 +24,16 @@ logger = logging.getLogger("world_loader")
 
 # ─── Public entry point ───────────────────────────────────────────────────────
 
-def load_world_from_hdf5(input_file):
+def load_world_from_hdf5(input_file, compute_activity_stats: bool = False):
     """Load WorldData from world_state.h5 (slim mode).
 
     Args:
         input_file: path to world_state.h5 (str or Path)
+        compute_activity_stats: compute the per-unit and world-level activity
+            breakdowns (the `np.unique` over the full activity map costs tens
+            of seconds). Live WorldMap omits these from the landing page and
+            unit-detail panel, so it loads with the fast default; the static
+            export still shows activity stats, so it loads with `True`.
 
     Returns:
         WorldData with geography, population, and venues.
@@ -102,7 +107,7 @@ def load_world_from_hdf5(input_file):
         slim_statistics = None
         logger.info("Computing slim statistics...")
         try:
-            slim_statistics = _compute_slim_statistics(f)
+            slim_statistics = _compute_slim_statistics(f, compute_activity_stats)
         except Exception as exc:
             logger.warning(f"Failed to compute slim statistics: {exc}")
 
@@ -110,7 +115,9 @@ def load_world_from_hdf5(input_file):
         if geography:
             logger.info("Computing per-unit statistics...")
             try:
-                unit_statistics = compute_unit_statistics(f, geography, include_activity_counts=True)
+                unit_statistics = compute_unit_statistics(
+                    f, geography, include_activity_counts=compute_activity_stats
+                )
                 logger.info(f"Per-unit statistics computed for {len(unit_statistics)} units.")
             except Exception as exc:
                 logger.warning(f"Failed to compute unit statistics: {exc}")
@@ -165,8 +172,13 @@ def _compute_array_stats(data, max_categories: int = 25) -> dict:
         return {'type': 'unknown', 'error': str(exc)}
 
 
-def _compute_slim_statistics(f) -> dict:
-    """Compute aggregate statistics from an open HDF5 file."""
+def _compute_slim_statistics(f, compute_activity_stats: bool = False) -> dict:
+    """Compute aggregate statistics from an open HDF5 file.
+
+    `compute_activity_stats` gates the world-level activity-map breakdown
+    (an `np.unique` over the full activity map costing tens of seconds) —
+    skipped on the live WorldMap load path, computed for the static export.
+    """
     stats: dict = {}
 
     # ── person properties ────────────────────────────────────────────────────
@@ -211,7 +223,11 @@ def _compute_slim_statistics(f) -> dict:
     activity_group_name = (
         'activity_mappings' if 'activity_mappings' in f else 'relationships'
     )
-    if activity_group_name in f and 'activity_map' in f[activity_group_name]:
+    if (
+        compute_activity_stats
+        and activity_group_name in f
+        and 'activity_map' in f[activity_group_name]
+    ):
         am               = f[activity_group_name]['activity_map']
         activity_names   = am['activity_names'][:].astype(str)
         activity_offsets = am['activity_offsets'][:]
