@@ -8,7 +8,7 @@ from flask import Flask
 
 from world_map.testing import WorldBuilder
 from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
-from world_explorer.explorer_loader import ExplorerLoader
+from world_reader import RecordReader
 from world_explorer.routes.explorer import explorer_bp
 
 
@@ -46,15 +46,18 @@ def explorer_client(venue_members_h5):
     # PERSON_ID_TO_IDX: id0→idx1, id1→idx2, id2→idx0
     person_id_to_idx  = np.array([1, 2, 0], dtype=np.int64)
     subset_venue_ids  = np.array([0], dtype=np.int64)
-    world             = WorldBuilder().build_world()
-    loader            = ExplorerLoader(venue_members_h5, person_id_to_idx, subset_venue_ids,
-                                       world.geography)
+    world  = (WorldBuilder()
+              .with_person_id_to_idx(person_id_to_idx)
+              .with_subset_venue_ids(subset_venue_ids)
+              .build_world())
+    loader = RecordReader(venue_members_h5, world)
 
     app = Flask(__name__)
     app.config['TESTING']         = True
     app.config[_EXPLORER_CTX_KEY] = ExplorerContext(
         world=world,
-        explorer_loader=loader,
+        record_reader=loader,
+        theme={},
     )
     app.register_blueprint(explorer_bp)
     return app.test_client()

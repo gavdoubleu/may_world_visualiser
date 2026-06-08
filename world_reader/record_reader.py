@@ -1,37 +1,36 @@
-"""On-demand HDF5 data access for WorldExplorer detail views."""
+"""On-demand HDF5 record reads, shared by WorldMap and WorldExplorer."""
 
 import h5py
 import numpy as np
 
-from world_map.core.pagination import calc_total_pages
+from world_reader.convert import SEX_DECODE, decode_str
+from world_reader.pagination import calc_total_pages
+from world_reader.statistics import (
+    compute_population_statistics as _compute_population_statistics,
+    compute_geographical_distribution as _compute_geographical_distribution,
+)
 
-_SEX_DECODE = {0: 'male', 1: 'female', 2: 'unknown'}
 
+class RecordReader:
+    """All per-request HDF5 reads, wired to a resident WorldStore for indices."""
 
-class ExplorerLoader:
-    def __init__(self, hdf5_path, person_id_to_idx, subset_venue_ids, geography,
-                 subtree_index=None, person_geo_unit_ids=None, venue_geo_unit_ids=None,
-                 venue_types_arr=None, venue_type_names=None,
-                 venue_list_position=None, person_list_position=None,
-                 venue_parent_ids=None, venue_child_counts=None,
-                 venue_child_total_members=None,
-                 children_by_parent_sorted=None, children_parent_ids_sorted=None):
+    def __init__(self, hdf5_path, store):
         self._hdf5_path = str(hdf5_path)
-        self._person_id_to_idx    = person_id_to_idx
-        self._subset_venue_ids    = subset_venue_ids
-        self._geography           = geography
-        self._subtree_index       = subtree_index
-        self._person_geo_unit_ids = person_geo_unit_ids
-        self._venue_geo_unit_ids  = venue_geo_unit_ids
-        self._venue_types_arr     = venue_types_arr
-        self._venue_type_names_cache = venue_type_names or []
-        self._venue_list_position = venue_list_position
-        self._person_list_position = person_list_position
-        self._venue_parent_ids           = venue_parent_ids
-        self._venue_child_counts         = venue_child_counts
-        self._venue_child_total_members  = venue_child_total_members
-        self._children_by_parent_sorted  = children_by_parent_sorted
-        self._children_parent_ids_sorted = children_parent_ids_sorted
+        self._person_id_to_idx    = store.person_id_to_idx
+        self._subset_venue_ids    = store.subset_venue_ids
+        self._geography           = store.geography
+        self._subtree_index       = store.subtree_index
+        self._person_geo_unit_ids = store.person_geo_unit_ids
+        self._venue_geo_unit_ids  = store.venue_geo_unit_ids
+        self._venue_types_arr     = store.venue_types_arr
+        self._venue_type_names_cache = store.venue_type_names or []
+        self._venue_list_position = store.venue_list_position
+        self._person_list_position = store.person_list_position
+        self._venue_parent_ids           = store.venue_parent_ids
+        self._venue_child_counts         = store.venue_child_counts
+        self._venue_child_total_members  = store.venue_child_total_members
+        self._children_by_parent_sorted  = store.children_by_parent_sorted
+        self._children_parent_ids_sorted = store.children_parent_ids_sorted
 
     def load_person_activities(self, person_id: int) -> list[dict] | None:
         """Return ActivityMap records for person_id, or None if not found."""
@@ -58,7 +57,7 @@ class ExplorerLoader:
             venue_names      = f['metadata/names/venues']
             subset_names     = f['metadata/names/subsets']
             venue_types      = f['venues/types']
-            venue_type_names = [self._decode(n) for n in f['metadata/registries/venue_types'][:]]
+            venue_type_names = [decode_str(n) for n in f['metadata/registries/venue_types'][:]]
             venue_geo_ids    = f['venues/geo_unit_ids']
 
             activities = []
@@ -67,8 +66,8 @@ class ExplorerLoader:
                 venue_id     = int(row[2])
                 subset_pos   = int(row[3])
 
-                act_name   = self._decode(act_names[act_type_idx])
-                venue_name = self._decode(venue_names[venue_id])
+                act_name   = decode_str(act_names[act_type_idx])
+                venue_name = decode_str(venue_names[venue_id])
                 vtype_idx  = int(venue_types[venue_id])
                 venue_type = venue_type_names[vtype_idx] if vtype_idx < len(venue_type_names) else 'unknown'
 
@@ -80,7 +79,7 @@ class ExplorerLoader:
                 last_sub  = int(np.searchsorted(self._subset_venue_ids, venue_id, side='right'))
                 if first_sub < last_sub:
                     subset_row  = first_sub + subset_pos
-                    subset_name = self._decode(subset_names[subset_row])
+                    subset_name = decode_str(subset_names[subset_row])
                 else:
                     subset_name = str(subset_pos)
 
@@ -105,7 +104,7 @@ class ExplorerLoader:
             return {'venue_id': venue_id, 'venue_name': str(venue_id), 'subsets': []}
 
         with h5py.File(self._hdf5_path, 'r') as f:
-            venue_name       = self._decode(f['metadata/names/venues'][venue_id])
+            venue_name       = decode_str(f['metadata/names/venues'][venue_id])
             subset_names_arr = f['metadata/names/subsets']
             members_offsets  = f['venues/subsets/members_offsets']
             members_flat     = f['venues/subsets/members_flat']
@@ -119,7 +118,7 @@ class ExplorerLoader:
 
             result_subsets = []
             for subset_row in range(first_sub, last_sub):
-                sname = self._decode(subset_names_arr[subset_row])
+                sname = decode_str(subset_names_arr[subset_row])
 
                 if subset_filter and sname != subset_filter:
                     continue
@@ -165,7 +164,7 @@ class ExplorerLoader:
                     members.append({
                         'id':       int(id_val),
                         'age':      int(age_val),
-                        'sex':      _SEX_DECODE.get(int(sex_val), 'unknown'),
+                        'sex':      SEX_DECODE.get(int(sex_val), 'unknown'),
                         'geo_unit': geo_unit.name if geo_unit else str(int(geo_id_val)),
                     })
 
@@ -179,6 +178,17 @@ class ExplorerLoader:
                 })
 
         return {'venue_id': venue_id, 'venue_name': venue_name, 'subsets': result_subsets}
+
+    # ── whole-world aggregate reads ──────────────────────────────────────────
+
+    def compute_population_statistics(self) -> dict:
+        """Population-wide total/age/sex aggregates (see world_reader.statistics)."""
+        with h5py.File(self._hdf5_path, 'r') as f:
+            return _compute_population_statistics(f)
+
+    def compute_geographical_distribution(self) -> dict:
+        """Per-level counts of people by their direct geo unit."""
+        return _compute_geographical_distribution(self._person_geo_unit_ids, self._geography)
 
     # ── slim detail / list reads (no in-memory Person/Venue objects) ─────────────
 
@@ -197,13 +207,13 @@ class ExplorerLoader:
 
         with h5py.File(self._hdf5_path, 'r') as f:
             age    = int(f['population/ages'][array_idx])
-            sex    = _SEX_DECODE.get(int(f['population/sexes'][array_idx]), 'unknown')
+            sex    = SEX_DECODE.get(int(f['population/sexes'][array_idx]), 'unknown')
             geo_id = int(f['population/geo_unit_ids'][array_idx])
 
             properties = {}
             if 'population/properties' in f:
                 for key in f['population/properties']:
-                    properties[key] = self._decode(f[f'population/properties/{key}'][array_idx])
+                    properties[key] = decode_str(f[f'population/properties/{key}'][array_idx])
 
         unit = self._geography.units_by_id.get(geo_id)
         geo_info = None
@@ -240,7 +250,7 @@ class ExplorerLoader:
             for id_val, age_val, sex_val in zip(ids, ages, sexes):
                 people.append({
                     'id': int(id_val), 'age': int(age_val),
-                    'sex': _SEX_DECODE.get(int(sex_val), 'unknown'),
+                    'sex': SEX_DECODE.get(int(sex_val), 'unknown'),
                     'activities': [], 'primary_activity': None,
                 })
 
@@ -295,12 +305,12 @@ class ExplorerLoader:
                                            else 0)
                     venues.append({
                         'id': int(venue_id),
-                        'name': self._decode(name_b),
+                        'name': decode_str(name_b),
                         'type': (type_names[int(type_code)]
                                  if int(type_code) < len(type_names) else 'unknown'),
                         'coordinates': (None if np.isnan(lat)
                                         else [float(lat), float(lon)]),
-                        'properties': {},
+                        'properties': self._venue_properties(f, int(venue_id)),
                         'geo_unit': self._unit_name(int(geo_id)),
                         'subsets': self._venue_subsets(f, int(venue_id)),
                         'child_count': child_count,
@@ -312,6 +322,41 @@ class ExplorerLoader:
             'page': page, 'per_page': per_page,
             'total_pages': calc_total_pages(total, per_page), 'venues': venues,
         }
+
+    def load_venues_by_type(self, venue_type: str) -> list[dict]:
+        """All venues of `venue_type` with coordinates, as map-ready rows:
+        {id, name, type, geo_unit, coordinates, num_members, properties}.
+        Bulk array read — no per-venue Python objects."""
+        if (self._venue_types_arr is None
+                or venue_type not in self._venue_type_names_cache):
+            return []
+        type_code = self._venue_type_names_cache.index(venue_type)
+        rows = np.where(self._venue_types_arr == type_code)[0]
+        if not len(rows):
+            return []
+
+        venues = []
+        with h5py.File(self._hdf5_path, 'r') as f:
+            idx     = rows.tolist()
+            names   = f['metadata/names/venues'][idx]
+            lats    = f['venues/latitudes'][idx]
+            lons    = f['venues/longitudes'][idx]
+            geo_ids = f['venues/geo_unit_ids'][idx]
+            for venue_id, name_b, lat, lon, geo_id in zip(
+                    idx, names, lats, lons, geo_ids):
+                if np.isnan(lat):
+                    continue
+                subsets = self._venue_subsets(f, int(venue_id))
+                venues.append({
+                    'id': int(venue_id),
+                    'name': decode_str(name_b),
+                    'type': venue_type,
+                    'geo_unit': self._unit_name(int(geo_id)),
+                    'coordinates': [float(lat), float(lon)],
+                    'num_members': sum(s['num_members'] for s in subsets),
+                    'properties': self._venue_properties(f, int(venue_id)),
+                })
+        return venues
 
     def load_venue_detail(self, venue_id: int) -> dict | None:
         """Single venue detail (venue_id is a direct array row) plus its subsets."""
@@ -325,12 +370,12 @@ class ExplorerLoader:
             geo_id     = int(f['venues/geo_unit_ids'][venue_id])
             return {
                 'id': venue_id,
-                'name': self._decode(f['metadata/names/venues'][venue_id]),
+                'name': decode_str(f['metadata/names/venues'][venue_id]),
                 'type': (type_names[type_code]
                          if type_code < len(type_names) else 'unknown'),
                 'geo_unit': self._unit_name(geo_id),
                 'coordinates': (None if np.isnan(lat) else [lat, lon]),
-                'properties': {},
+                'properties': self._venue_properties(f, venue_id),
                 'subsets': self._venue_subsets(f, venue_id),
             }
 
@@ -366,11 +411,11 @@ class ExplorerLoader:
                         idx, names, types, lats, lons, geo_ids):
                     venues.append({
                         'id': int(venue_row),
-                        'name': self._decode(name_b),
+                        'name': decode_str(name_b),
                         'type': (type_names[int(type_code)]
                                  if int(type_code) < len(type_names) else 'unknown'),
                         'coordinates': (None if np.isnan(lat) else [float(lat), float(lon)]),
-                        'properties': {},
+                        'properties': self._venue_properties(f, int(venue_row)),
                         'geo_unit': self._unit_name(int(geo_id)),
                         'subsets': self._venue_subsets(f, int(venue_row)),
                         'child_count': 0,
@@ -432,8 +477,17 @@ class ExplorerLoader:
             return []
         names   = f['metadata/names/subsets'][first:last]
         counts  = f['venues/subsets/member_counts'][first:last]
-        return [{'name': self._decode(n), 'num_members': int(c)}
+        return [{'name': decode_str(n), 'num_members': int(c)}
                 for n, c in zip(names, counts)]
+
+    @staticmethod
+    def _venue_properties(f, venue_id: int) -> dict:
+        """{'is_residence': bool} for a venue, mirroring the eager loader's
+        slim-mode properties (the only venue property it ever populated)."""
+        properties = {}
+        if 'venues/is_residence' in f:
+            properties['is_residence'] = bool(f['venues/is_residence'][venue_id])
+        return properties
 
     def _unit_name(self, geo_id: int) -> str | None:
         unit = self._geography.units_by_id.get(geo_id)
@@ -442,10 +496,6 @@ class ExplorerLoader:
     @staticmethod
     def _venue_type_names(f) -> list[str]:
         if 'metadata/registries/venue_types' in f:
-            return [ExplorerLoader._decode(n)
+            return [decode_str(n)
                     for n in f['metadata/registries/venue_types'][:]]
         return []
-
-    @staticmethod
-    def _decode(val) -> str:
-        return val.decode() if isinstance(val, bytes) else str(val)

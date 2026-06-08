@@ -1,7 +1,7 @@
 # ADR 0001: WorldExplorer lazy HDF5 backend
 
 ## Status
-Accepted — 2026-05-29
+Superseded by ADR 0002 — 2026-06-08
 
 ## Context
 WorldExplorer and WorldMap originally shared one loader,

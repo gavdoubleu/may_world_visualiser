@@ -1,7 +1,6 @@
 """Population API blueprint."""
 
-from flask import Blueprint, jsonify, request
-from collections import defaultdict
+from flask import Blueprint, jsonify
 import logging
 
 from world_map.utils import convert_numpy_types
@@ -16,24 +15,12 @@ population_bp = Blueprint('population', __name__)
 def get_population_statistics():
     """Get overall population statistics."""
     try:
-        world = get_app_context().world
-        if not world.population:
-            return jsonify({'error': 'No population data'}), 404
+        loader = get_app_context().record_reader
 
-        stats = world.population.get_statistics()
+        stats = loader.compute_population_statistics()
+        stats['geographical_distribution'] = loader.compute_geographical_distribution()
 
-        # Add geographical distribution
-        geo_distribution = defaultdict(int)
-        if world.geography:
-            for level in world.geography.levels:
-                units = world.geography.get_units_by_level(level)
-                for unit in units.values():
-                    if unit.people:
-                        geo_distribution[level] += len(unit.people)
-
-        stats['geographical_distribution'] = dict(geo_distribution)
-
-        return jsonify(stats)
+        return jsonify(convert_numpy_types(stats))
 
     except Exception as e:
         logger.error(f"Error getting population statistics: {e}")
@@ -42,54 +29,43 @@ def get_population_statistics():
 
 @population_bp.route('/api/population/person/<int:person_id>')
 def get_person_details(person_id):
-    """Get detailed information about a specific person including activity_map."""
-    try:
-        world = get_app_context().world
-        if not world.population:
-            return jsonify({'error': 'No population data'}), 404
+    """Get detailed information about a specific person including activity_map.
 
-        person = world.population.get_person(person_id)
-        if not person:
+    NOTE: the eager slim-mode loader never populated `person.activities`/
+    `activity_map`/`properties` (always `[]`/`{}`/`{}`), so this endpoint always
+    returned them empty in production — the frontend has dormant rendering code
+    for them (app.js ~1105, ~1151). `load_person_slim`/`load_person_activities`
+    now supply real data, so this migration activates those code paths rather
+    than changing existing behaviour.
+    """
+    try:
+        ctx = get_app_context()
+        loader = ctx.record_reader
+
+        person = loader.load_person_slim(person_id)
+        if person is None:
             return jsonify({'error': f'Person {person_id} not found'}), 404
 
-        # Get geographical unit info
-        geo_info = None
-        if person.geographical_unit:
-            geo_info = {
-                'id': person.geographical_unit.id,
-                'name': person.geographical_unit.name,
-                'level': person.geographical_unit.level,
-                'coordinates': person.geographical_unit.coordinates
-            }
+        activities = loader.load_person_activities(person_id) or []
 
-        # Build activity_map representation
-        activity_map_data = {}
-        if hasattr(person, 'activity_map') and person.activity_map:
-            for activity_type, venues_by_type in person.activity_map.items():
-                activity_map_data[activity_type] = {}
-                if isinstance(venues_by_type, dict):
-                    for venue_type, subsets in venues_by_type.items():
-                        subset_list = []
-                        if subsets:
-                            for subset in (subsets if isinstance(subsets, list) else [subsets]):
-                                if subset:
-                                    subset_info = {
-                                        'subset_name': getattr(subset, 'name', 'unknown'),
-                                        'venue_id': getattr(subset.venue, 'id', None) if hasattr(subset, 'venue') else None,
-                                        'venue_name': getattr(subset.venue, 'name', 'unknown') if hasattr(subset, 'venue') else 'unknown',
-                                        'venue_type': getattr(subset.venue, 'type', venue_type) if hasattr(subset, 'venue') else venue_type
-                                    }
-                                    subset_list.append(subset_info)
-                        activity_map_data[activity_type][venue_type] = subset_list
+        activity_map_data: dict = {}
+        for record in activities:
+            by_venue_type = activity_map_data.setdefault(record['activity_name'], {})
+            by_venue_type.setdefault(record['venue_type'], []).append({
+                'subset_name': record['subset_name'],
+                'venue_id':    record['venue_id'],
+                'venue_name':  record['venue_name'],
+                'venue_type':  record['venue_type'],
+            })
 
         return jsonify(convert_numpy_types({
-            'id': person.id,
-            'age': person.age,
-            'sex': person.sex,
-            'activities': person.activities,
+            'id': person['id'],
+            'age': person['age'],
+            'sex': person['sex'],
+            'activities': [record['activity_name'] for record in activities],
             'activity_map': activity_map_data,
-            'properties': person.properties,
-            'geographical_unit': geo_info
+            'properties': person['properties'],
+            'geographical_unit': person['geographical_unit'],
         }))
 
     except Exception as e:

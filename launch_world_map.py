@@ -7,20 +7,20 @@ Loads world_state.h5 with no dependencies on the may module.
 import sys
 from pathlib import Path
 
-from world_map.core.world_loader import load_world_from_hdf5
+from world_reader import build_world_store
 
 # Import the Flask app
 from world_map.app import create_app
 
 
 def load_world_from_file(filepath):
-    """Load WorldData from a world_state.h5 file."""
+    """Build a WorldStore from a world_state.h5 file."""
     path = Path(filepath)
     if not path.exists():
         raise FileNotFoundError(f"World file not found: {filepath}")
     if path.suffix.lower() not in ('.h5', '.hdf5'):
         raise ValueError(f"Expected .h5 or .hdf5, got '{path.suffix}'")
-    return load_world_from_hdf5(str(path))
+    return build_world_store(str(path))
 
 
 def main():
@@ -221,7 +221,7 @@ Examples:
     # Initialize and run the Flask app
     from pathlib import Path as _Path
     config_path = _Path(args.config) if args.config else None
-    app = create_app(world, map_config=map_config, config_path=config_path)
+    app = create_app(world, args.world_file, map_config=map_config, config_path=config_path)
 
     # Initialize events if provided
     if args.events_file:

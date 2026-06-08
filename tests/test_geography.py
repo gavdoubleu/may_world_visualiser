@@ -59,4 +59,4 @@ def test_geography_unit_detail_stats(client_for):
     assert data['population'] == 5
     assert data['slim_mode'] is True
     assert '25-34' in data['age_distribution']
-    assert 'M' in data['sex_distribution']
+    assert 'male' in data['sex_distribution']  # world_reader decodes sex codes to labels

@@ -5,7 +5,6 @@ import logging
 
 from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
-from world_map.core.pagination import paginate
 
 logger = logging.getLogger(__name__)
 
@@ -136,57 +135,28 @@ def get_unit_details(unit_name):
 
 @geography_bp.route('/api/geography/unit/<unit_name>/people')
 def get_unit_people(unit_name):
-    """Get list of people in a geographical unit with pagination."""
+    """Get list of people in a geographical unit's subtree, paginated.
+
+    NOTE: returns the unit's whole subtree (matching WorldExplorer's
+    `load_unit_people`) — the eager route's `include_descendants=false`
+    default (direct residents only) is dropped, since the frontend never
+    set that param. `activities`/`primary_activity` are empty/null per the
+    deferred-stats decision (see docs/handoff/activity-stats-on-demand.md).
+    """
     try:
-        world = get_app_context().world
+        ctx = get_app_context()
+        world = ctx.world
         if not world.geography:
             return jsonify({'error': 'No geography data'}), 404
 
-        unit = world.geography.get_unit(unit_name)
-        if not unit:
+        if not world.geography.get_unit(unit_name):
             return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 50, type=int)
         per_page = min(per_page, 200)
 
-        include_descendants = request.args.get('include_descendants', 'false').lower() == 'true'
-        all_people = unit.get_people() if include_descendants else (list(unit.people) if unit.people else [])
-        total_count = len(all_people)
-
-        sl = paginate(all_people, page, per_page)
-
-        people_data = []
-        for person in sl.items:
-            primary_activity = None
-            if hasattr(person, 'activity_map') and person.activity_map:
-                if 'primary_activity' in person.activity_map:
-                    for venue_type, subsets in person.activity_map['primary_activity'].items():
-                        if subsets:
-                            subset = subsets[0] if isinstance(subsets, list) else subsets
-                            if subset and hasattr(subset, 'venue'):
-                                primary_activity = {
-                                    'type': venue_type,
-                                    'venue_name': getattr(subset.venue, 'name', 'unknown')
-                                }
-                                break
-
-            people_data.append({
-                'id': person.id,
-                'age': person.age,
-                'sex': person.sex,
-                'activities': list(person.activities) if isinstance(person.activities, set) else person.activities,
-                'primary_activity': primary_activity
-            })
-
-        return jsonify({
-            'unit_name':   unit_name,
-            'total_count': sl.total,
-            'page':        sl.page,
-            'per_page':    sl.per_page,
-            'total_pages': sl.total_pages,
-            'people':      people_data,
-        })
+        return jsonify(ctx.record_reader.load_unit_people(unit_name, page, per_page))
 
     except Exception as e:
         logger.error(f"Error getting people for unit {unit_name}: {e}")

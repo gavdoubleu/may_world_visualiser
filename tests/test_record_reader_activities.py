@@ -1,11 +1,11 @@
-"""Tests for ExplorerLoader.load_person_activities."""
+"""Tests for RecordReader.load_person_activities."""
 
 import numpy as np
 import pytest
 import h5py
 
 from world_map.testing import WorldBuilder
-from world_explorer.explorer_loader import ExplorerLoader
+from world_reader import RecordReader
 
 
 @pytest.fixture
@@ -56,8 +56,11 @@ def loader(person_activities_h5):
     person_id_to_idx[5] = 0
     person_id_to_idx[3] = 1
     subset_venue_ids = np.array([0], dtype=np.int64)
-    geography = WorldBuilder().build_world().geography
-    return ExplorerLoader(person_activities_h5, person_id_to_idx, subset_venue_ids, geography)
+    world = (WorldBuilder()
+             .with_person_id_to_idx(person_id_to_idx)
+             .with_subset_venue_ids(subset_venue_ids)
+             .build_world())
+    return RecordReader(person_activities_h5, world)
 
 
 def test_load_person_activities_returns_correct_record(loader):
@@ -81,10 +84,9 @@ def test_load_person_activities_returns_none_for_unknown_id(loader):
     assert loader.load_person_activities(999) is None
 
 
-# --- lazy subtree-backed reads (load_explorer_world end-to-end) ---
+# --- lazy subtree-backed reads (build_world_store end-to-end) ---
 
-from world_explorer.explorer_world_loader import load_explorer_world
-from world_explorer.explorer_loader import ExplorerLoader as _EL
+from world_reader import build_world_store
 
 
 @pytest.fixture
@@ -134,9 +136,8 @@ def subtree_world_h5(tmp_path):
 
 @pytest.fixture
 def subtree_loader(subtree_world_h5):
-    world = load_explorer_world(str(subtree_world_h5))
-    loader = _EL(str(subtree_world_h5), world.person_id_to_idx,
-                 world.subset_venue_ids, world.geography, world.subtree_index)
+    world  = build_world_store(str(subtree_world_h5))
+    loader = RecordReader(str(subtree_world_h5), world)
     return world, loader
 
 

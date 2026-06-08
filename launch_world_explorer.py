@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-from world_explorer.explorer_world_loader import load_explorer_world
+from world_reader import build_world_store
 from world_explorer.app import create_app
 
 
@@ -29,6 +29,9 @@ Examples:
                         help='Port (default: 5001)')
     parser.add_argument('--debug', action='store_true',
                         help='Flask debug mode')
+    parser.add_argument('--theme', type=str, default=None,
+                        help='Built-in theme name, e.g. dark_scientific, clean_minimal '
+                             '(default: dark_scientific)')
 
     args = parser.parse_args()
 
@@ -42,12 +45,12 @@ Examples:
 
     print(f'Loading world from: {world_path}')
     try:
-        world = load_explorer_world(str(world_path))
+        world = build_world_store(str(world_path))
     except Exception as exc:
         print(f'\nERROR: failed to load world: {exc}\n')
         sys.exit(1)
 
-    app = create_app(world, world_path)
+    app = create_app(world, world_path, theme=args.theme)
 
     print(f'\n{"=" * 50}')
     print('  WorldExplorer')
