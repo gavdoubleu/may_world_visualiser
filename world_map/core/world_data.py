@@ -3,73 +3,10 @@ Standalone data classes for world_map. No may dependencies.
 Duck-type compatible with the interface that app.py expects.
 """
 
-import math
-from dataclasses import dataclass, field
-
-AGE_LABELS: list[str] = ['0-15', '16-24', '25-34', '35-49', '50-64', '65+']
-AGE_BREAKS: list[float] = [0, 16, 25, 35, 50, 65, math.inf]
-
-
-def _age_label(age: int | float) -> str:
-    for i in range(len(AGE_LABELS) - 1):
-        if age < AGE_BREAKS[i + 1]:
-            return AGE_LABELS[i]
-    return AGE_LABELS[-1]
-
-
-@dataclass
-class UnitStats:
-    population: int
-    age_distribution: dict[str, int]
-    sex_distribution: dict[str, int]
-    venue_types: dict[str, int]
-    activity_counts: dict[str, int] = field(default_factory=dict)
-
-    @property
-    def venues_count(self) -> int:
-        return sum(self.venue_types.values())
-
-    def people_aged(self, label: str) -> int:
-        return self.age_distribution.get(label, 0)
-
-    def venues_of_type(self, venue_type: str) -> int:
-        return self.venue_types.get(str(venue_type), 0)
-
-    def to_dict(self) -> dict:
-        return {
-            'population':       self.population,
-            'age_distribution': self.age_distribution,
-            'sex_distribution': self.sex_distribution,
-            'venues_count':     self.venues_count,
-            'venue_types':      self.venue_types,
-            'activity_counts':  self.activity_counts,
-        }
-
-
-class GeoUnit:
-    def __init__(self, unit_id, name, level, coordinates=None, properties=None):
-        self.id = unit_id
-        self.name = name
-        self.level = level
-        self.coordinates = coordinates
-        self.parent = None
-        self.children = []
-        self.people = []
-        self.venues = []
-        self.properties = properties or {}
-
-    def get_people(self):
-        all_people = list(self.people)
-        for child in self.children:
-            all_people.extend(child.get_people())
-        return all_people
-
-    def get_descendants(self):
-        descendants = []
-        for child in self.children:
-            descendants.append(child)
-            descendants.extend(child.get_descendants())
-        return descendants
+from world_reader.geography import (
+    AGE_LABELS, AGE_BREAKS, age_label as _age_label,
+    UnitStats, GeoUnit, GeographyManager,
+)
 
 
 class Person:
@@ -101,27 +38,6 @@ class Venue:
         self.subsets = {}
         self.parent = None
         self.properties = properties or {}
-
-
-class GeographyManager:
-    def __init__(self, levels=None):
-        self.levels = levels or []
-        self.units_by_id = {}
-        self._units_by_name = {}
-        self._units_by_level = {}
-
-    def add_unit(self, unit):
-        self.units_by_id[unit.id] = unit
-        self._units_by_name[unit.name] = unit
-        if unit.level not in self._units_by_level:
-            self._units_by_level[unit.level] = {}
-        self._units_by_level[unit.level][unit.name] = unit
-
-    def get_unit(self, name):
-        return self._units_by_name.get(name)
-
-    def get_units_by_level(self, level):
-        return self._units_by_level.get(level, {})
 
 
 class PopulationManager:

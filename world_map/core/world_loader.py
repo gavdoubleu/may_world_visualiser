@@ -10,32 +10,16 @@ import time
 import h5py
 import numpy as np
 
+from world_reader.convert import SEX_DECODE
+from world_reader.geography import load_geography as _load_geography
+
 from .world_data import (
-    WorldData, GeographyManager, GeoUnit,
-    PopulationManager, Person,
+    WorldData, PopulationManager, Person,
     VenueManager, Venue, Subset,
     AGE_LABELS, AGE_BREAKS, UnitStats,
 )
 
 logger = logging.getLogger("world_loader")
-
-
-# ─── numpy value conversion ───────────────────────────────────────────────────
-
-def _convert_numpy_value(value):
-    if value is None:
-        return None
-    if isinstance(value, (np.integer, np.int64, np.int32)):
-        return int(value)
-    if isinstance(value, (np.floating, np.float64, np.float32)):
-        return float(value)
-    if isinstance(value, np.ndarray):
-        return [_convert_numpy_value(v) for v in value]
-    if isinstance(value, (np.str_, np.bytes_)):
-        return str(value)
-    if isinstance(value, bytes):
-        return value.decode('utf-8')
-    return value
 
 
 # ─── Public entry point ───────────────────────────────────────────────────────
@@ -479,77 +463,15 @@ def _compute_unit_statistics(f, geography) -> dict:
 
 # ─── HDF5 loading functions ───────────────────────────────────────────────────
 
-def _load_geography(geo_group, geo_names=None, level_registry=None):
-    """Reconstruct GeographyManager from HDF5 geography group."""
-    ids = geo_group['ids'][:]
-
-    names = geo_names if geo_names is not None else geo_group['names'][:].astype(str)
-
-    if level_registry is not None:
-        levels = np.array([level_registry[int(v)] for v in geo_group['levels'][:]])
-    else:
-        levels = geo_group['levels'][:].astype(str)
-
-    unique_levels = list(dict.fromkeys(str(lvl) for lvl in levels))
-    parent_ids    = geo_group['parent_ids'][:]
-
-    latitudes  = None
-    longitudes = None
-    if 'latitudes' in geo_group and 'longitudes' in geo_group:
-        latitudes  = geo_group['latitudes'][:]
-        longitudes = geo_group['longitudes'][:]
-
-    properties_by_unit = {}
-    if 'properties' in geo_group:
-        for prop_name in geo_group['properties'].keys():
-            properties_by_unit[prop_name] = geo_group['properties'][prop_name][:]
-
-    geography = GeographyManager(levels=unique_levels)
-
-    units_by_id = {}
-    for i, (unit_id, name, level) in enumerate(zip(ids, names, levels)):
-        coordinates = None
-        if latitudes is not None and not np.isnan(latitudes[i]):
-            coordinates = (float(latitudes[i]), float(longitudes[i]))
-
-        properties = {
-            prop_name: _convert_numpy_value(prop_array[i])
-            for prop_name, prop_array in properties_by_unit.items()
-        }
-
-        unit = GeoUnit(
-            unit_id=int(unit_id),
-            name=str(name),
-            level=str(level),
-            coordinates=coordinates,
-            properties=properties,
-        )
-        units_by_id[int(unit_id)] = unit
-
-    for unit_id, parent_id in zip(ids, parent_ids):
-        if int(parent_id) != -1:
-            child  = units_by_id[int(unit_id)]
-            parent = units_by_id[int(parent_id)]
-            child.parent = parent
-            parent.children.append(child)
-
-    for unit in units_by_id.values():
-        geography.add_unit(unit)
-
-    logger.info(f"  Loaded {len(units_by_id)} geographical units")
-    return geography
-
-
 def _load_population(pop_group, geography):
     """Reconstruct PopulationManager from HDF5 population group (slim mode)."""
     ids          = pop_group['ids'][:]
     ages         = pop_group['ages'][:]
     geo_unit_ids = pop_group['geo_unit_ids'][:]
 
-    _SEX_DECODE = {0: "male", 1: "female", 2: "unknown"}
     sex_raw = pop_group['sexes'][:]
     if sex_raw.dtype.kind in ('u', 'i'):
-        sexes = np.array([_SEX_DECODE.get(int(v), "unknown") for v in sex_raw])
+        sexes = np.array([SEX_DECODE.get(int(v), "unknown") for v in sex_raw])
     else:
         sexes = sex_raw.astype(str)
 
