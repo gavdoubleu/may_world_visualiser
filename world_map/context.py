@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from world_map.events.event_aggregator import EventAggregator
 
-from world_map.core.world_data import WorldData, Venue
+from world_reader.explorer_world import ExplorerWorld
+from world_reader.explorer_loader import ExplorerLoader
 from world_map.projection.base import MapProjectionConfig
 from world_map.config import AppConfig
 
@@ -16,8 +17,8 @@ _CTX_KEY = 'APP_CONTEXT'
 
 @dataclass
 class AppContext:
-    world: WorldData
-    venue_index: dict[int, Venue]
+    world: ExplorerWorld
+    explorer_loader: ExplorerLoader
     projection: MapProjectionConfig
     map_config: dict
     app_config: AppConfig

@@ -53,7 +53,7 @@ from pathlib import Path
 WORLD_MAP_DIR = Path(__file__).parent.resolve() / 'world_map'
 
 from world_map.themes.theme_css import build_root_block
-from world_map.core.world_loader import load_world_from_hdf5
+from world_reader.explorer_world import load_explorer_world
 
 LEAFLET_VERSION = '1.9.4'
 LEAFLET_JS_URL = f'https://unpkg.com/leaflet@{LEAFLET_VERSION}/dist/leaflet.js'
@@ -642,7 +642,7 @@ window.STATIC_WORLD_DATA = {data_json};
 # ---------------------------------------------------------------------------
 
 def load_world_from_file(filepath: str):
-    """Load WorldData from a world_state.h5 file."""
+    """Load an ExplorerWorld from a world_state.h5 file."""
     path = Path(filepath)
     if not path.exists():
         raise FileNotFoundError(f"World file not found: {filepath}")
@@ -652,7 +652,7 @@ def load_world_from_file(filepath: str):
         )
     # Static export must always show activity stats (the live landing page
     # omits them to keep cold start fast — see docs/handoff/activity-stats-on-demand.md).
-    return load_world_from_hdf5(str(path), compute_activity_stats=True)
+    return load_explorer_world(str(path), compute_activity_stats=True)
 
 
 # ---------------------------------------------------------------------------
@@ -811,7 +811,7 @@ def main() -> None:
     from world_map.app import create_app
 
     config_path = Path(args.config) if args.config else None
-    flask_app = create_app(world, map_config=map_config, config_path=config_path)
+    flask_app = create_app(world, args.world_file, map_config=map_config, config_path=config_path)
     flask_app.config['TESTING'] = True
 
     # -- Active projection info ------------------------------------------------

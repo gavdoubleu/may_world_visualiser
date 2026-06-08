@@ -201,3 +201,258 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
         )
         for name, d in all_stats.items()
     }
+
+
+# ─── slim (whole-world) statistics ────────────────────────────────────────────
+
+_SEX_LABELS = np.array(['male', 'female', 'unknown'])
+
+
+def _compute_array_stats(data, max_categories: int = 25) -> dict:
+    """Numeric or categorical summary stats for a single HDF5 dataset array."""
+    if data.dtype.kind in ('f', 'u', 'i'):
+        arr = data.astype(np.float64).ravel()
+        finite = arr[np.isfinite(arr)]
+        if len(finite) == 0:
+            return {'type': 'numeric', 'count': 0}
+        return {
+            'type': 'numeric',
+            'count': int(len(finite)),
+            'mean': round(float(np.mean(finite)), 4),
+            'std': round(float(np.std(finite)), 4),
+            'min': float(np.min(finite)),
+            'max': float(np.max(finite)),
+            'p25': float(np.percentile(finite, 25)),
+            'median': float(np.median(finite)),
+            'p75': float(np.percentile(finite, 75)),
+        }
+    try:
+        values = data.astype(str)
+        unique, counts = np.unique(values, return_counts=True)
+        total = int(len(values))
+        order = np.argsort(-counts)
+        top_u = unique[order[:max_categories]]
+        top_c = counts[order[:max_categories]]
+        return {
+            'type': 'categorical',
+            'count': total,
+            'unique_count': int(len(unique)),
+            'top_values': {
+                str(k): {'count': int(v), 'pct': round(100.0 * v / total, 2)}
+                for k, v in zip(top_u, top_c)
+            },
+        }
+    except Exception as exc:
+        return {'type': 'unknown', 'error': str(exc)}
+
+
+def compute_slim_statistics(f, compute_activity_stats: bool = False) -> dict:
+    """Compute aggregate statistics from an open HDF5 file.
+
+    `compute_activity_stats` gates the world-level activity-map breakdown
+    (an `np.unique` over the full activity map costing tens of seconds) —
+    skipped on live loads, computed for the static export.
+    """
+    stats: dict = {}
+
+    # ── person properties ────────────────────────────────────────────────────
+    person_stats: dict = {}
+    if 'population' in f:
+        pop = f['population']
+        if 'ages' in pop:
+            person_stats['age'] = _compute_array_stats(pop['ages'][:])
+        if 'sexes' in pop:
+            sex_raw = pop['sexes'][:]
+            if sex_raw.dtype.kind in ('u', 'i'):
+                sexes = _SEX_LABELS[np.clip(sex_raw.astype(np.int64), 0, 2)]
+            else:
+                sexes = sex_raw.astype(str)
+            person_stats['sex'] = _compute_array_stats(sexes)
+        if 'properties' in pop:
+            for prop_name in pop['properties'].keys():
+                try:
+                    person_stats[prop_name] = _compute_array_stats(
+                        pop['properties'][prop_name][:]
+                    )
+                except Exception as exc:
+                    person_stats[prop_name] = {'type': 'error', 'error': str(exc)}
+    stats['person_properties'] = person_stats
+
+    # ── subset sizes ─────────────────────────────────────────────────────────
+    if 'venues' in f and 'subsets' in f['venues']:
+        mc = f['venues']['subsets']['member_counts'][:].astype(np.int64)
+        non_empty = mc[mc > 0]
+        if len(non_empty):
+            stats['subset_sizes'] = {
+                'mean': round(float(np.mean(non_empty)), 2),
+                'median': float(np.median(non_empty)),
+                'min': int(np.min(non_empty)),
+                'max': int(np.max(non_empty)),
+                'total_subsets': int(len(mc)),
+                'non_empty_subsets': int(len(non_empty)),
+            }
+
+    # ── activity map ─────────────────────────────────────────────────────────
+    activity_group_name = (
+        'activity_mappings' if 'activity_mappings' in f else 'relationships'
+    )
+    if (
+        compute_activity_stats
+        and activity_group_name in f
+        and 'activity_map' in f[activity_group_name]
+    ):
+        am               = f[activity_group_name]['activity_map']
+        activity_names   = am['activity_names'][:].astype(str)
+        activity_offsets = am['activity_offsets'][:]
+        activity_data    = am['activity_data'][:]
+
+        n_people = len(activity_offsets)
+        n_rows   = len(activity_data)
+
+        if n_rows > 0:
+            pairs = np.unique(activity_data[:, [0, 1]].astype(np.int64), axis=0)
+            people_per_act = np.zeros(len(activity_names), dtype=np.int64)
+            np.add.at(people_per_act, pairs[:, 1], 1)
+            unique_people    = int(len(np.unique(pairs[:, 0])))
+            mean_unique_acts = len(pairs) / unique_people if unique_people else 0.0
+        else:
+            people_per_act   = np.zeros(len(activity_names), dtype=np.int64)
+            unique_people    = 0
+            mean_unique_acts = 0.0
+
+        mean_assignments = n_rows / n_people if n_people else 0.0
+
+        if 'venues' in f and 'subsets' in f['venues'] and n_rows > 0:
+            mc_arr       = f['venues']['subsets']['member_counts'][:].astype(np.float64)
+            non_empty_mc = mc_arr[mc_arr > 0]
+            mean_contacts_est = (
+                round(float(np.mean(non_empty_mc - 1)) * mean_assignments, 1)
+                if len(non_empty_mc) else 0.0
+            )
+        else:
+            mean_contacts_est = 0.0
+
+        stats['activity_map'] = {
+            'activity_counts': {
+                str(activity_names[i]): int(people_per_act[i])
+                for i in range(len(activity_names))
+            },
+            'total_people_with_activities': unique_people,
+            'mean_activity_types_per_person': round(float(mean_unique_acts), 2),
+            'mean_venue_assignments_per_person': round(float(mean_assignments), 2),
+            'mean_contacts_estimate': mean_contacts_est,
+        }
+
+    # ── venue properties ─────────────────────────────────────────────────────
+    venue_prop_stats: dict = {}
+    if 'venues' in f and 'properties' in f['venues']:
+        for venue_type in f['venues']['properties'].keys():
+            vt_stats: dict = {}
+            for prop_name in f['venues']['properties'][venue_type].keys():
+                try:
+                    vt_stats[prop_name] = _compute_array_stats(
+                        f['venues']['properties'][venue_type][prop_name][:]
+                    )
+                except Exception as exc:
+                    vt_stats[prop_name] = {'type': 'error', 'error': str(exc)}
+            if vt_stats:
+                venue_prop_stats[venue_type] = vt_stats
+    stats['venue_properties'] = venue_prop_stats
+
+    return stats
+
+
+# ─── whole-world aggregate helpers (bulk-array, no sort/np.unique over N) ──────
+
+def compute_population_statistics(f) -> dict:
+    """Population-wide total/age/sex aggregates from HDF5 arrays.
+
+    Sex codes are bounded (0/1/2), so a bincount scatter replaces the
+    sort-based grouping that doesn't scale to large populations.
+    """
+    if 'population' not in f:
+        return {'total_people': 0}
+
+    pop  = f['population']
+    ages = pop['ages'][:]
+    total = len(ages)
+    if not total:
+        return {'total_people': 0}
+
+    sex_raw = pop['sexes'][:]
+    if sex_raw.dtype.kind in ('u', 'i'):
+        sex_codes  = np.clip(sex_raw.astype(np.int64), 0, 2)
+        sex_counts = np.bincount(sex_codes, minlength=3)
+        sex_distribution = {
+            label: int(sex_counts[code])
+            for code, label in enumerate(_SEX_LABELS)
+            if sex_counts[code] > 0
+        }
+    else:
+        sex_unique, sex_counts = np.unique(sex_raw.astype(str), return_counts=True)
+        sex_distribution = {str(k): int(v) for k, v in zip(sex_unique, sex_counts)}
+
+    return {
+        'total_people': int(total),
+        'age_stats': {
+            'mean': round(float(np.mean(ages)), 2),
+            'min': int(np.min(ages)),
+            'max': int(np.max(ages)),
+        },
+        'sex_distribution': sex_distribution,
+    }
+
+
+def compute_geographical_distribution(person_geo_unit_ids, geography) -> dict:
+    """Per-level counts of people by their *direct* geo unit (not descendants).
+
+    Geo-unit IDs are bounded small-integer codes, so this is a single
+    id→level lookup scatter plus a bincount — O(N + units), no per-unit
+    Python loop over resident people lists.
+    """
+    if person_geo_unit_ids is None or len(person_geo_unit_ids) == 0:
+        return {}
+
+    levels = list(geography.levels)
+    level_to_code = {level: code for code, level in enumerate(levels)}
+
+    max_id = int(person_geo_unit_ids.max())
+    geoid_to_level_code = np.full(max_id + 1, -1, dtype=np.int64)
+    for unit_id, unit in geography.units_by_id.items():
+        if 0 <= unit_id <= max_id:
+            geoid_to_level_code[unit_id] = level_to_code.get(unit.level, -1)
+
+    level_codes = geoid_to_level_code[person_geo_unit_ids.astype(np.int64)]
+    valid       = level_codes >= 0
+    counts      = np.bincount(level_codes[valid], minlength=len(levels))
+
+    return {levels[code]: int(counts[code]) for code in range(len(levels)) if counts[code] > 0}
+
+
+def compute_venue_type_counts(venue_types_arr, venue_type_names) -> dict:
+    """Venue counts per type, derived from the resident type-code array."""
+    if venue_types_arr is None or len(venue_types_arr) == 0:
+        return {}
+    counts = np.bincount(venue_types_arr.astype(np.int64), minlength=len(venue_type_names))
+    return {
+        venue_type_names[code]: int(counts[code])
+        for code in range(len(venue_type_names))
+        if counts[code] > 0
+    }
+
+
+def venue_type_names_present(venue_types_arr, venue_type_names) -> list[str]:
+    """Distinct venue type names present, ordered by first appearance.
+
+    Mirrors `VenueManager.get_venue_types()` (insertion-order dict keys) —
+    used by `/api/world/statistics`'s `venue_types` list.
+    """
+    if venue_types_arr is None or len(venue_types_arr) == 0:
+        return []
+    codes = venue_types_arr.astype(np.int64)
+    n     = len(venue_type_names)
+    first_pos = np.full(n, len(codes), dtype=np.int64)
+    np.minimum.at(first_pos, codes, np.arange(len(codes), dtype=np.int64))
+    present = np.where(first_pos < len(codes))[0]
+    order   = present[np.argsort(first_pos[present])]
+    return [venue_type_names[code] for code in order]

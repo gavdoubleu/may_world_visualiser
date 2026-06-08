@@ -5,6 +5,10 @@ import numpy as np
 
 from world_reader.convert import SEX_DECODE, decode_str
 from world_reader.pagination import calc_total_pages
+from world_reader.statistics import (
+    compute_population_statistics as _compute_population_statistics,
+    compute_geographical_distribution as _compute_geographical_distribution,
+)
 
 
 class ExplorerLoader:
@@ -179,6 +183,17 @@ class ExplorerLoader:
 
         return {'venue_id': venue_id, 'venue_name': venue_name, 'subsets': result_subsets}
 
+    # ── whole-world aggregate reads ──────────────────────────────────────────
+
+    def compute_population_statistics(self) -> dict:
+        """Population-wide total/age/sex aggregates (see world_reader.statistics)."""
+        with h5py.File(self._hdf5_path, 'r') as f:
+            return _compute_population_statistics(f)
+
+    def compute_geographical_distribution(self) -> dict:
+        """Per-level counts of people by their direct geo unit."""
+        return _compute_geographical_distribution(self._person_geo_unit_ids, self._geography)
+
     # ── slim detail / list reads (no in-memory Person/Venue objects) ─────────────
 
     def load_person_slim(self, person_id: int) -> dict | None:
@@ -299,7 +314,7 @@ class ExplorerLoader:
                                  if int(type_code) < len(type_names) else 'unknown'),
                         'coordinates': (None if np.isnan(lat)
                                         else [float(lat), float(lon)]),
-                        'properties': {},
+                        'properties': self._venue_properties(f, int(venue_id)),
                         'geo_unit': self._unit_name(int(geo_id)),
                         'subsets': self._venue_subsets(f, int(venue_id)),
                         'child_count': child_count,
@@ -343,7 +358,7 @@ class ExplorerLoader:
                     'geo_unit': self._unit_name(int(geo_id)),
                     'coordinates': [float(lat), float(lon)],
                     'num_members': sum(s['num_members'] for s in subsets),
-                    'properties': {},
+                    'properties': self._venue_properties(f, int(venue_id)),
                 })
         return venues
 
@@ -364,7 +379,7 @@ class ExplorerLoader:
                          if type_code < len(type_names) else 'unknown'),
                 'geo_unit': self._unit_name(geo_id),
                 'coordinates': (None if np.isnan(lat) else [lat, lon]),
-                'properties': {},
+                'properties': self._venue_properties(f, venue_id),
                 'subsets': self._venue_subsets(f, venue_id),
             }
 
@@ -404,7 +419,7 @@ class ExplorerLoader:
                         'type': (type_names[int(type_code)]
                                  if int(type_code) < len(type_names) else 'unknown'),
                         'coordinates': (None if np.isnan(lat) else [float(lat), float(lon)]),
-                        'properties': {},
+                        'properties': self._venue_properties(f, int(venue_row)),
                         'geo_unit': self._unit_name(int(geo_id)),
                         'subsets': self._venue_subsets(f, int(venue_row)),
                         'child_count': 0,
@@ -468,6 +483,15 @@ class ExplorerLoader:
         counts  = f['venues/subsets/member_counts'][first:last]
         return [{'name': decode_str(n), 'num_members': int(c)}
                 for n, c in zip(names, counts)]
+
+    @staticmethod
+    def _venue_properties(f, venue_id: int) -> dict:
+        """{'is_residence': bool} for a venue, mirroring the eager loader's
+        slim-mode properties (the only venue property it ever populated)."""
+        properties = {}
+        if 'venues/is_residence' in f:
+            properties['is_residence'] = bool(f['venues/is_residence'][venue_id])
+        return properties
 
     def _unit_name(self, geo_id: int) -> str | None:
         unit = self._geography.units_by_id.get(geo_id)

@@ -19,6 +19,7 @@ import numpy as np
 
 from world_reader import compute_unit_statistics
 from world_reader.geography import load_geography
+from world_reader.statistics import compute_slim_statistics
 
 logger = logging.getLogger("explorer_world_loader")
 
@@ -235,8 +236,16 @@ def _build_locate_indices(subtree_index, geography,
 
 # ─── public entry point ───────────────────────────────────────────────────────
 
-def load_explorer_world(input_file):
-    """Load an ExplorerWorld from world_state.h5 without materialising people/venues."""
+def load_explorer_world(input_file, compute_activity_stats: bool = False):
+    """Load an ExplorerWorld from world_state.h5 without materialising people/venues.
+
+    Args:
+        input_file: path to world_state.h5 (str or Path)
+        compute_activity_stats: compute the per-unit and world-level activity
+            breakdowns (the `np.unique` over the full activity map costs tens
+            of seconds). Live loads omit these (fast default); the static
+            export needs them, so it loads with `True`.
+    """
     logger.info("Loading explorer world (lazy mode) from %s", input_file)
     t_start = time.perf_counter()
 
@@ -253,7 +262,10 @@ def load_explorer_world(input_file):
             raise OSError("No geography data found in HDF5 file")
 
         geography       = load_geography(f['geography'], geo_names, level_registry)
-        unit_statistics = compute_unit_statistics(f, geography, include_activity_counts=False)
+        unit_statistics = compute_unit_statistics(
+            f, geography, include_activity_counts=compute_activity_stats
+        )
+        slim_statistics = compute_slim_statistics(f, compute_activity_stats)
 
         # lookup arrays (cheap; serve single-record lazy reads)
         person_ids       = f['population/ids'][:]
@@ -307,7 +319,7 @@ def load_explorer_world(input_file):
     )
 
     world = ExplorerWorld(
-        geography, None, unit_statistics,
+        geography, slim_statistics, unit_statistics,
         person_id_to_idx, subset_venue_ids, subtree_index,
         person_geo_unit_ids, venue_geo_unit_ids, venue_types_arr,
         venue_type_names, venue_list_position, person_list_position,
