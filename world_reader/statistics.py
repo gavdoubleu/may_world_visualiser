@@ -444,8 +444,8 @@ def compute_venue_type_counts(venue_types_arr, venue_type_names) -> dict:
 def venue_type_names_present(venue_types_arr, venue_type_names) -> list[str]:
     """Distinct venue type names present, ordered by first appearance.
 
-    Mirrors `VenueManager.get_venue_types()` (insertion-order dict keys) —
-    used by `/api/world/statistics`'s `venue_types` list.
+    Returns insertion-order-distinct names — used by `/api/world/statistics`'s
+    `venue_types` list.
     """
     if venue_types_arr is None or len(venue_types_arr) == 0:
         return []
