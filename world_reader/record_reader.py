@@ -1,4 +1,4 @@
-"""On-demand HDF5 data access for WorldExplorer detail views."""
+"""On-demand HDF5 record reads, shared by WorldMap and WorldExplorer."""
 
 import h5py
 import numpy as np
@@ -11,30 +11,26 @@ from world_reader.statistics import (
 )
 
 
-class ExplorerLoader:
-    def __init__(self, hdf5_path, person_id_to_idx, subset_venue_ids, geography,
-                 subtree_index=None, person_geo_unit_ids=None, venue_geo_unit_ids=None,
-                 venue_types_arr=None, venue_type_names=None,
-                 venue_list_position=None, person_list_position=None,
-                 venue_parent_ids=None, venue_child_counts=None,
-                 venue_child_total_members=None,
-                 children_by_parent_sorted=None, children_parent_ids_sorted=None):
+class RecordReader:
+    """All per-request HDF5 reads, wired to a resident WorldStore for indices."""
+
+    def __init__(self, hdf5_path, store):
         self._hdf5_path = str(hdf5_path)
-        self._person_id_to_idx    = person_id_to_idx
-        self._subset_venue_ids    = subset_venue_ids
-        self._geography           = geography
-        self._subtree_index       = subtree_index
-        self._person_geo_unit_ids = person_geo_unit_ids
-        self._venue_geo_unit_ids  = venue_geo_unit_ids
-        self._venue_types_arr     = venue_types_arr
-        self._venue_type_names_cache = venue_type_names or []
-        self._venue_list_position = venue_list_position
-        self._person_list_position = person_list_position
-        self._venue_parent_ids           = venue_parent_ids
-        self._venue_child_counts         = venue_child_counts
-        self._venue_child_total_members  = venue_child_total_members
-        self._children_by_parent_sorted  = children_by_parent_sorted
-        self._children_parent_ids_sorted = children_parent_ids_sorted
+        self._person_id_to_idx    = store.person_id_to_idx
+        self._subset_venue_ids    = store.subset_venue_ids
+        self._geography           = store.geography
+        self._subtree_index       = store.subtree_index
+        self._person_geo_unit_ids = store.person_geo_unit_ids
+        self._venue_geo_unit_ids  = store.venue_geo_unit_ids
+        self._venue_types_arr     = store.venue_types_arr
+        self._venue_type_names_cache = store.venue_type_names or []
+        self._venue_list_position = store.venue_list_position
+        self._person_list_position = store.person_list_position
+        self._venue_parent_ids           = store.venue_parent_ids
+        self._venue_child_counts         = store.venue_child_counts
+        self._venue_child_total_members  = store.venue_child_total_members
+        self._children_by_parent_sorted  = store.children_by_parent_sorted
+        self._children_parent_ids_sorted = store.children_parent_ids_sorted
 
     def load_person_activities(self, person_id: int) -> list[dict] | None:
         """Return ActivityMap records for person_id, or None if not found."""

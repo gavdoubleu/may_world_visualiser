@@ -48,12 +48,12 @@ def get_event_loader():
 
 
 def create_app(world, hdf5_path, map_config=None, config_path=None):
-    """Initialize the Flask app with an ExplorerWorld and optional map configuration.
+    """Initialize the Flask app with a WorldStore and optional map configuration.
 
     map_config keys: background_type, image_url, bounds, attribution.
     config_path: path to config.yaml; defaults to world_map/yaml/config.yaml.
     hdf5_path: path to the world_state.h5 backing `world` — wired into
-        ExplorerLoader for on-demand single-record reads (people, venues,
+        RecordReader for on-demand single-record reads (people, venues,
         persons), mirroring world_explorer's wiring.
     """
     app = Flask(__name__)
@@ -71,25 +71,8 @@ def create_app(world, hdf5_path, map_config=None, config_path=None):
         default_map_config.update(map_config)
     app.config['MAP_CONFIG'] = default_map_config
 
-    from world_reader.explorer_loader import ExplorerLoader
-    explorer_loader = ExplorerLoader(
-        hdf5_path,
-        world.person_id_to_idx,
-        world.subset_venue_ids,
-        world.geography,
-        world.subtree_index,
-        world.person_geo_unit_ids,
-        world.venue_geo_unit_ids,
-        world.venue_types_arr,
-        world.venue_type_names,
-        world.venue_list_position,
-        world.person_list_position,
-        world.venue_parent_ids,
-        world.venue_child_counts,
-        world.venue_child_total_members,
-        world.children_by_parent_sorted,
-        world.children_parent_ids_sorted,
-    )
+    from world_reader import RecordReader
+    record_reader = RecordReader(hdf5_path, world)
 
     from world_map.config import AppConfig, _DEFAULT_CONFIG_PATH
     if config_path is None:
@@ -124,7 +107,7 @@ def create_app(world, hdf5_path, map_config=None, config_path=None):
     from world_map.context import AppContext, _CTX_KEY
     app.config[_CTX_KEY] = AppContext(
         world=world,
-        explorer_loader=explorer_loader,
+        record_reader=record_reader,
         projection=_projection,
         map_config=default_map_config,
         app_config=cfg,

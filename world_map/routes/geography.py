@@ -156,7 +156,7 @@ def get_unit_people(unit_name):
         per_page = request.args.get('per_page', 50, type=int)
         per_page = min(per_page, 200)
 
-        return jsonify(ctx.explorer_loader.load_unit_people(unit_name, page, per_page))
+        return jsonify(ctx.record_reader.load_unit_people(unit_name, page, per_page))
 
     except Exception as e:
         logger.error(f"Error getting people for unit {unit_name}: {e}")

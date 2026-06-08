@@ -15,7 +15,7 @@ population_bp = Blueprint('population', __name__)
 def get_population_statistics():
     """Get overall population statistics."""
     try:
-        loader = get_app_context().explorer_loader
+        loader = get_app_context().record_reader
 
         stats = loader.compute_population_statistics()
         stats['geographical_distribution'] = loader.compute_geographical_distribution()
@@ -40,7 +40,7 @@ def get_person_details(person_id):
     """
     try:
         ctx = get_app_context()
-        loader = ctx.explorer_loader
+        loader = ctx.record_reader
 
         person = loader.load_person_slim(person_id)
         if person is None:

@@ -1,11 +1,11 @@
 """Test factory: builds synthetic HDF5 worlds and AppContexts via the shared
-world_reader lazy backend (ExplorerWorld/ExplorerLoader).
+world_reader lazy backend (WorldStore/RecordReader).
 
 Writes a small synthetic world_state.h5 and loads it through the real
-load_explorer_world/ExplorerLoader path, mirroring the fixture-building patterns
-in tests/test_explorer_loader.py (subtree_world_h5) and tests/test_bulk_venues.py
-(bulk_venues_h5) — exercises the same backend as production rather than a
-duck-typed stand-in.
+build_world_store/RecordReader path, mirroring the fixture-building patterns
+in tests/test_record_reader_activities.py (subtree_world_h5) and
+tests/test_bulk_venues.py (bulk_venues_h5) — exercises the same backend as
+production rather than a duck-typed stand-in.
 """
 
 from __future__ import annotations
@@ -16,19 +16,32 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from world_reader.explorer_world import load_explorer_world
-from world_reader.explorer_loader import ExplorerLoader
+from world_reader import WorldStore, RecordReader, build_world_store
 from world_map.context import AppContext
 from world_map.config import AppConfig
 from world_map.projection.web_mercator import WebMercatorConfig
 
 
 class WorldBuilder:
-    """Fluent builder for HDF5-backed ExplorerWorld/AppContext in tests."""
+    """Fluent builder for HDF5-backed WorldStore/AppContext in tests."""
 
     def __init__(self) -> None:
         self._units: list[dict] = []
         self._levels: list[str] = []
+        self._person_id_to_idx_override: np.ndarray | None = None
+        self._subset_venue_ids_override: np.ndarray | None = None
+
+    def with_person_id_to_idx(self, person_id_to_idx: np.ndarray) -> 'WorldBuilder':
+        """Override the built world's person_id_to_idx (for index-translation tests
+        against hand-rolled HDF5 fixtures whose population doesn't match this
+        builder's synthetic data)."""
+        self._person_id_to_idx_override = person_id_to_idx
+        return self
+
+    def with_subset_venue_ids(self, subset_venue_ids: np.ndarray) -> 'WorldBuilder':
+        """Override the built world's subset_venue_ids — see with_person_id_to_idx."""
+        self._subset_venue_ids_override = subset_venue_ids
+        return self
 
     def add_unit(
         self,
@@ -101,49 +114,39 @@ class WorldBuilder:
             f.create_dataset('venues/subsets/member_counts', data=np.array([], dtype=np.int32))
             f.create_dataset('metadata/names/subsets', data=np.array([], dtype=dt))
 
-    def build_world(self, compute_activity_stats: bool = False):
-        """Write a synthetic HDF5 and load it as an ExplorerWorld.
+    def build_world(self, compute_activity_stats: bool = False) -> WorldStore:
+        """Write a synthetic HDF5 and build it into a WorldStore.
 
         Pins the backing temp directory to the returned world so lazy
-        ExplorerLoader reads keep working once this builder goes out of scope.
+        RecordReader reads keep working once this builder goes out of scope.
+        Applies any with_person_id_to_idx/with_subset_venue_ids overrides —
+        for index-translation tests that need a coherent WorldStore (geography,
+        subtree_index, etc.) carrying deliberately-scrambled index arrays.
         """
         tmpdir  = tempfile.TemporaryDirectory()
         h5_path = Path(tmpdir.name) / 'world.h5'
         self._write_hdf5(h5_path)
 
-        world = load_explorer_world(str(h5_path), compute_activity_stats=compute_activity_stats)
+        world = build_world_store(str(h5_path), compute_activity_stats=compute_activity_stats)
         world._builder_tmpdir    = tmpdir     # keep alive — deletes the .h5 on GC
         world._builder_hdf5_path = str(h5_path)
+        if self._person_id_to_idx_override is not None:
+            world.person_id_to_idx = self._person_id_to_idx_override
+        if self._subset_venue_ids_override is not None:
+            world.subset_venue_ids = self._subset_venue_ids_override
         return world
 
-    def build_loader(self, world=None) -> ExplorerLoader:
-        """Build an ExplorerLoader wired to a freshly-built (or given) world."""
+    def build_loader(self, world=None) -> RecordReader:
+        """Build a RecordReader wired to a freshly-built (or given) world."""
         world = world if world is not None else self.build_world()
-        return ExplorerLoader(
-            world._builder_hdf5_path,
-            world.person_id_to_idx,
-            world.subset_venue_ids,
-            world.geography,
-            world.subtree_index,
-            world.person_geo_unit_ids,
-            world.venue_geo_unit_ids,
-            world.venue_types_arr,
-            world.venue_type_names,
-            world.venue_list_position,
-            world.person_list_position,
-            world.venue_parent_ids,
-            world.venue_child_counts,
-            world.venue_child_total_members,
-            world.children_by_parent_sorted,
-            world.children_parent_ids_sorted,
-        )
+        return RecordReader(world._builder_hdf5_path, world)
 
     def build_context(self, **overrides) -> AppContext:
         world  = self.build_world()
         loader = self.build_loader(world)
         defaults: dict = dict(
             world=world,
-            explorer_loader=loader,
+            record_reader=loader,
             projection=WebMercatorConfig(),
             map_config={'background_type': 'osm'},
             app_config=AppConfig.minimal(),

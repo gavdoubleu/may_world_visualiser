@@ -1,11 +1,10 @@
-"""Tests for ExplorerLoader.load_venues_by_type (bulk venue read for the map layer)."""
+"""Tests for RecordReader.load_venues_by_type (bulk venue read for the map layer)."""
 
 import numpy as np
 import pytest
 import h5py
 
-from world_reader.explorer_loader import ExplorerLoader
-from world_reader.explorer_world import load_explorer_world
+from world_reader import RecordReader, build_world_store
 
 
 @pytest.fixture
@@ -59,26 +58,8 @@ def bulk_venues_h5(tmp_path):
 
 @pytest.fixture
 def bulk_venues_loader(bulk_venues_h5):
-    world = load_explorer_world(str(bulk_venues_h5))
-    loader = ExplorerLoader(
-        str(bulk_venues_h5),
-        world.person_id_to_idx,
-        world.subset_venue_ids,
-        world.geography,
-        world.subtree_index,
-        world.person_geo_unit_ids,
-        world.venue_geo_unit_ids,
-        world.venue_types_arr,
-        world.venue_type_names,
-        world.venue_list_position,
-        world.person_list_position,
-        world.venue_parent_ids,
-        world.venue_child_counts,
-        world.venue_child_total_members,
-        world.children_by_parent_sorted,
-        world.children_parent_ids_sorted,
-    )
-    return loader
+    world = build_world_store(str(bulk_venues_h5))
+    return RecordReader(str(bulk_venues_h5), world)
 
 
 def test_load_venues_by_type_returns_expected_rows(bulk_venues_loader):
