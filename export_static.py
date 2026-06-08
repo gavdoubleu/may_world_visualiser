@@ -650,7 +650,9 @@ def load_world_from_file(filepath: str):
         raise ValueError(
             f"Unsupported file format '{path.suffix}'. Expected .h5 or .hdf5."
         )
-    return load_world_from_hdf5(str(path))
+    # Static export must always show activity stats (the live landing page
+    # omits them to keep cold start fast — see docs/handoff/activity-stats-on-demand.md).
+    return load_world_from_hdf5(str(path), compute_activity_stats=True)
 
 
 # ---------------------------------------------------------------------------
