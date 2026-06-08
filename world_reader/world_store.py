@@ -19,6 +19,7 @@ import numpy as np
 
 from world_reader import compute_unit_statistics
 from world_reader.geography import load_geography
+from world_reader.id_index import IdIndex
 from world_reader.statistics import compute_slim_statistics
 
 logger = logging.getLogger("world_store")
@@ -66,12 +67,15 @@ class WorldStore:
                  venue_type_names, venue_list_position, person_list_position,
                  venue_parent_ids=None, venue_child_counts=None,
                  venue_child_total_members=None,
-                 children_by_parent_sorted=None, children_parent_ids_sorted=None):
+                 children_by_parent_sorted=None, children_parent_ids_sorted=None,
+                 venue_ids=None, venue_id_to_idx=None):
         self.geography = geography
         self._slim_statistics = slim_statistics
         self._unit_statistics = unit_statistics
         self.person_id_to_idx = person_id_to_idx
         self.subset_venue_ids = subset_venue_ids
+        self.venue_ids = venue_ids
+        self.venue_id_to_idx = venue_id_to_idx
         self.subtree_index = subtree_index
         self.person_geo_unit_ids  = person_geo_unit_ids
         self.venue_geo_unit_ids   = venue_geo_unit_ids
@@ -268,9 +272,11 @@ def build_world_store(input_file, compute_activity_stats: bool = False):
 
         # lookup arrays (cheap; serve single-record lazy reads)
         person_ids       = f['population/ids'][:]
-        person_id_to_idx = np.empty_like(person_ids)
-        person_id_to_idx[person_ids] = np.arange(len(person_ids), dtype=person_ids.dtype)
+        person_id_to_idx = IdIndex(person_ids)
         subset_venue_ids = f['venues/subsets/venue_ids'][:]
+
+        venue_ids        = f['venues/ids'][:] if 'venues/ids' in f else np.array([], dtype=np.int32)
+        venue_id_to_idx  = IdIndex(venue_ids)
 
         subtree_index, person_geo_unit_ids, venue_geo_unit_ids = (
             _build_subtree_index(f, geography))
@@ -327,6 +333,8 @@ def build_world_store(input_file, compute_activity_stats: bool = False):
         venue_child_total_members=venue_child_total_members,
         children_by_parent_sorted=children_by_parent_sorted,
         children_parent_ids_sorted=children_parent_ids_sorted,
+        venue_ids=venue_ids,
+        venue_id_to_idx=venue_id_to_idx,
     )
     logger.info("World store built in %.2fs: %s",
                 time.perf_counter() - t_start, world)

@@ -17,6 +17,7 @@ import h5py
 import numpy as np
 
 from world_reader import WorldStore, RecordReader, build_world_store
+from world_reader.id_index import IdIndex
 from world_map.context import AppContext
 from world_map.config import AppConfig
 from world_map.projection.web_mercator import WebMercatorConfig
@@ -30,17 +31,29 @@ class WorldBuilder:
         self._levels: list[str] = []
         self._person_id_to_idx_override: np.ndarray | None = None
         self._subset_venue_ids_override: np.ndarray | None = None
+        self._venue_ids_override: np.ndarray | None = None
+        self._venue_id_to_idx_override: IdIndex | None = None
 
-    def with_person_id_to_idx(self, person_id_to_idx: np.ndarray) -> 'WorldBuilder':
-        """Override the built world's person_id_to_idx (for index-translation tests
+    def with_person_id_to_idx(self, person_ids_in_row_order: np.ndarray) -> 'WorldBuilder':
+        """Override the built world's person_id_to_idx, built (via IdIndex) from
+        the given logical person IDs in row order — for index-translation tests
         against hand-rolled HDF5 fixtures whose population doesn't match this
-        builder's synthetic data)."""
-        self._person_id_to_idx_override = person_id_to_idx
+        builder's synthetic data."""
+        self._person_id_to_idx_override = IdIndex(person_ids_in_row_order)
         return self
 
     def with_subset_venue_ids(self, subset_venue_ids: np.ndarray) -> 'WorldBuilder':
         """Override the built world's subset_venue_ids — see with_person_id_to_idx."""
         self._subset_venue_ids_override = subset_venue_ids
+        return self
+
+    def with_venue_id_to_idx(self, venue_ids_in_row_order: np.ndarray) -> 'WorldBuilder':
+        """Override the built world's venue_id_to_idx (and venue_ids), built (via
+        IdIndex) from the given logical venue IDs in row order — for
+        index-translation tests against hand-rolled HDF5 fixtures whose venues
+        don't match this builder's synthetic data (which has none)."""
+        self._venue_ids_override = np.asarray(venue_ids_in_row_order)
+        self._venue_id_to_idx_override = IdIndex(venue_ids_in_row_order)
         return self
 
     def add_unit(
@@ -134,6 +147,9 @@ class WorldBuilder:
             world.person_id_to_idx = self._person_id_to_idx_override
         if self._subset_venue_ids_override is not None:
             world.subset_venue_ids = self._subset_venue_ids_override
+        if self._venue_id_to_idx_override is not None:
+            world.venue_ids = self._venue_ids_override
+            world.venue_id_to_idx = self._venue_id_to_idx_override
         return world
 
     def build_loader(self, world=None) -> RecordReader:
