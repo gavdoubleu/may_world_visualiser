@@ -1,9 +1,11 @@
 """Lazy world store shared by WorldMap and WorldExplorer.
 
 Holds only what both apps need resident: the geography tree, aggregate
-statistics, and lightweight per-unit row indices. Person/Venue/Subset records
-are NOT materialised as Python objects — they are served on demand from HDF5 by
-RecordReader.
+statistics, the geographical distribution, and lightweight per-unit row
+indices. Person/Venue/Subset records are NOT materialised as Python objects —
+they are served on demand from HDF5 by RecordReader. Per-row geo_unit_ids are
+likewise not kept resident; they are read lazily, per record, mirroring
+load_person_slim.
 
 Reuses world_reader's shared load_geography and compute_unit_statistics;
 deliberately skips loading population / venues as Python objects, which would
@@ -20,7 +22,7 @@ import numpy as np
 from world_reader import compute_unit_statistics
 from world_reader.geography import load_geography
 from world_reader.id_index import IdIndex
-from world_reader.statistics import compute_slim_statistics
+from world_reader.statistics import compute_geographical_distribution, compute_slim_statistics
 
 logger = logging.getLogger("world_store")
 
@@ -57,13 +59,15 @@ class SubtreeIndex:
 class WorldStore:
     """Lightweight resident world store: geography + stats + indices only.
 
-    Holds `geography`, `_unit_statistics`, `_slim_statistics`. `population` /
-    `venues` are intentionally absent — those are served lazily from HDF5.
+    Holds `geography`, `_unit_statistics`, `_slim_statistics`,
+    `geographical_distribution`. `population` / `venues` are intentionally
+    absent — those are served lazily from HDF5.
     """
 
     def __init__(self, geography, slim_statistics, unit_statistics,
+                 geographical_distribution,
                  person_id_to_idx, subset_venue_ids, subtree_index,
-                 person_geo_unit_ids, venue_geo_unit_ids, venue_types_arr,
+                 venue_types_arr,
                  venue_type_names, venue_list_position, person_list_position,
                  venue_parent_ids=None, venue_child_counts=None,
                  venue_child_total_members=None,
@@ -72,13 +76,12 @@ class WorldStore:
         self.geography = geography
         self._slim_statistics = slim_statistics
         self._unit_statistics = unit_statistics
+        self.geographical_distribution = geographical_distribution
         self.person_id_to_idx = person_id_to_idx
         self.subset_venue_ids = subset_venue_ids
         self.venue_ids = venue_ids
         self.venue_id_to_idx = venue_id_to_idx
         self.subtree_index = subtree_index
-        self.person_geo_unit_ids  = person_geo_unit_ids
-        self.venue_geo_unit_ids   = venue_geo_unit_ids
         self.venue_types_arr      = venue_types_arr
         self.venue_type_names     = venue_type_names
         self.venue_list_position  = venue_list_position
@@ -281,6 +284,9 @@ def build_world_store(input_file, compute_activity_stats: bool = False):
         subtree_index, person_geo_unit_ids, venue_geo_unit_ids = (
             _build_subtree_index(f, geography))
 
+        geographical_distribution = compute_geographical_distribution(
+            person_geo_unit_ids, geography)
+
         venue_types_arr  = f['venues/types'][:] if 'venues/types' in f else np.array([], dtype=np.uint8)
         venue_type_names = []
         if 'metadata/registries/venue_types' in f:
@@ -325,8 +331,9 @@ def build_world_store(input_file, compute_activity_stats: bool = False):
 
     world = WorldStore(
         geography, slim_statistics, unit_statistics,
+        geographical_distribution,
         person_id_to_idx, subset_venue_ids, subtree_index,
-        person_geo_unit_ids, venue_geo_unit_ids, venue_types_arr,
+        venue_types_arr,
         venue_type_names, venue_list_position, person_list_position,
         venue_parent_ids=venue_parent_ids,
         venue_child_counts=venue_child_counts,

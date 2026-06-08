@@ -8,7 +8,6 @@ from world_reader.id_index import IdIndex
 from world_reader.pagination import calc_total_pages
 from world_reader.statistics import (
     compute_population_statistics as _compute_population_statistics,
-    compute_geographical_distribution as _compute_geographical_distribution,
 )
 
 
@@ -23,8 +22,7 @@ class RecordReader:
         self._venue_id_to_idx     = store.venue_id_to_idx
         self._geography           = store.geography
         self._subtree_index       = store.subtree_index
-        self._person_geo_unit_ids = store.person_geo_unit_ids
-        self._venue_geo_unit_ids  = store.venue_geo_unit_ids
+        self._geographical_distribution = store.geographical_distribution
         self._venue_types_arr     = store.venue_types_arr
         self._venue_type_names_cache = store.venue_type_names or []
         self._venue_list_position = store.venue_list_position
@@ -193,8 +191,8 @@ class RecordReader:
             return _compute_population_statistics(f)
 
     def compute_geographical_distribution(self) -> dict:
-        """Per-level counts of people by their direct geo unit."""
-        return _compute_geographical_distribution(self._person_geo_unit_ids, self._geography)
+        """Per-level counts of people by their direct geo unit (precomputed at launch)."""
+        return self._geographical_distribution
 
     # ── slim detail / list reads (no in-memory Person/Venue objects) ─────────────
 
@@ -441,16 +439,21 @@ class RecordReader:
             'venues':      venues,
         }
 
-    # ── locate (O(1) page lookup from startup position arrays) ───────────────────
+    # ── locate (page lookup via startup position arrays; geo_id read lazily) ─────
+    #
+    # `position`/`venue_type` come from O(1) resident-array reads (built at
+    # launch); `geo_id` is fetched lazily, per record, straight from HDF5 —
+    # the same pattern load_person_slim/load_unit_people use.
 
     def locate_venue(self, venue_id: int, per_page: int) -> dict | None:
         """Return {geo_unit, venue_type, page} for venue_id, or None if invalid."""
-        if self._venue_geo_unit_ids is None or self._venue_id_to_idx is None:
+        if self._venue_id_to_idx is None:
             return None
         row = int(self._venue_id_to_idx[venue_id])
         if row == IdIndex.MISSING:
             return None
-        geo_id     = int(self._venue_geo_unit_ids[row])
+        with h5py.File(self._hdf5_path, 'r') as f:
+            geo_id = int(f['venues/geo_unit_ids'][row])
         unit       = self._geography.units_by_id.get(geo_id)
         type_code  = int(self._venue_types_arr[row])
         venue_type = (self._venue_type_names_cache[type_code]
@@ -464,12 +467,13 @@ class RecordReader:
 
     def locate_person(self, person_id: int, per_page: int) -> dict | None:
         """Return {geo_unit, page} for person_id, or None if invalid."""
-        if self._person_geo_unit_ids is None or self._person_id_to_idx is None:
+        if self._person_id_to_idx is None:
             return None
         array_idx = int(self._person_id_to_idx[person_id])
         if array_idx == IdIndex.MISSING:
             return None
-        geo_id    = int(self._person_geo_unit_ids[array_idx])
+        with h5py.File(self._hdf5_path, 'r') as f:
+            geo_id = int(f['population/geo_unit_ids'][array_idx])
         unit      = self._geography.units_by_id.get(geo_id)
         position  = int(self._person_list_position[array_idx])
         return {
