@@ -5,10 +5,10 @@ statistics, and lightweight per-unit row indices. Person/Venue/Subset records
 are NOT materialised as Python objects — they are served on demand from HDF5 by
 ExplorerLoader. Contrast with world_map's eager in-memory object model.
 
-Reuses world_map's array-based helpers (_load_geography, _compute_slim_statistics,
-_compute_unit_statistics); deliberately skips _load_population / _load_venues,
-which build millions of objects and dominate cold-start (~9.5s for population
-alone on the medieval dataset).
+Reuses world_map's array-based helpers (_load_geography, _compute_slim_statistics)
+and world_reader's shared compute_unit_statistics; deliberately skips
+_load_population / _load_venues, which build millions of objects and dominate
+cold-start (~9.5s for population alone on the medieval dataset).
 """
 
 import logging
@@ -18,7 +18,7 @@ import h5py
 import numpy as np
 
 from world_map.core.world_loader import _load_geography
-from world_map.core.world_data import AGE_LABELS, AGE_BREAKS, UnitStats
+from world_reader import compute_unit_statistics
 
 logger = logging.getLogger("explorer_world_loader")
 
@@ -233,156 +233,6 @@ def _build_locate_indices(subtree_index, geography,
     return venue_list_position, person_list_position
 
 
-# ─── per-unit statistics (explorer-slim: no activity-map crunch) ──────────────
-
-def _compute_explorer_unit_statistics(f, geography):
-    """Per-unit population / age / sex / venue-type counts, aggregated upward.
-
-    Deliberately omits activity_counts: the explorer UI never displays them, and
-    computing them means an np.unique over the ~30M-row activity map (~tens of
-    seconds). world_map's _compute_unit_statistics keeps that block; the explorer
-    does not need it.
-    """
-    if 'population' not in f:
-        return {}
-
-    pop            = f['population']
-    person_geo_ids = pop['geo_unit_ids'][:]
-    ages           = pop['ages'][:].astype(np.float64)
-
-    sex_raw = pop['sexes'][:]
-    if sex_raw.dtype.kind in ('u', 'i'):
-        _sex_labels = np.array(['male', 'female', 'unknown'])
-        sexes = _sex_labels[np.clip(sex_raw.astype(np.int64), 0, 2)]
-    else:
-        sexes = sex_raw.astype(str)
-
-    uid_to_name   = {uid: u.name for uid, u in geography.units_by_id.items()}
-    AGE_BREAKS_NP = AGE_BREAKS[:-1] + [np.inf]
-
-    if len(person_geo_ids) == 0:
-        return {}
-
-    sort_idx = np.argsort(person_geo_ids, kind='stable')
-    sg = person_geo_ids[sort_idx]
-    sa = ages[sort_idx]
-    ss = sexes[sort_idx]
-
-    bounds   = np.where(np.diff(sg) != 0)[0] + 1
-    g_starts = np.concatenate([[0], bounds])
-    g_ends   = np.concatenate([bounds, [len(sg)]])
-
-    leaf_stats: dict = {}
-    for i, geo_id in enumerate(sg[g_starts]):
-        unit_name = uid_to_name.get(int(geo_id))
-        if unit_name is None:
-            continue
-        s, e = int(g_starts[i]), int(g_ends[i])
-
-        age_dist: dict = {}
-        for j, label in enumerate(AGE_LABELS):
-            lo, hi = AGE_BREAKS_NP[j], AGE_BREAKS_NP[j + 1]
-            age_dist[label] = int(np.sum((sa[s:e] >= lo) & (sa[s:e] < hi)))
-
-        sex_u, sex_c = np.unique(ss[s:e], return_counts=True)
-        leaf_stats[unit_name] = {
-            'population':       int(e - s),
-            'age_distribution': age_dist,
-            'sex_distribution': {str(k): int(v) for k, v in zip(sex_u, sex_c)},
-            'venue_types':      {},
-        }
-
-    # ── venue type counts per leaf unit ──────────────────────────────────────
-    if 'venues' in f:
-        v         = f['venues']
-        v_geo_ids = v['geo_unit_ids'][:]
-        types_raw = v['types'][:] if 'types' in v else np.array([], dtype='u1')
-
-        type_reg = None
-        try:
-            type_reg = f['metadata']['registries']['venue_types'][:].astype(str)
-        except Exception:
-            pass
-
-        if type_reg is not None and types_raw.dtype.kind in ('u', 'i') and len(types_raw):
-            v_types = type_reg[types_raw.astype(int)]
-        elif len(types_raw):
-            v_types = types_raw.astype(str)
-        else:
-            v_types = np.array([])
-
-        if len(v_types):
-            v_sort    = np.argsort(v_geo_ids, kind='stable')
-            svg       = v_geo_ids[v_sort]
-            svt       = v_types[v_sort]
-            vb        = np.where(np.diff(svg) != 0)[0] + 1
-            vs_starts = np.concatenate([[0], vb])
-            vs_ends   = np.concatenate([vb, [len(svg)]])
-
-            for i, geo_id in enumerate(svg[vs_starts]):
-                unit_name = uid_to_name.get(int(geo_id))
-                if unit_name and unit_name in leaf_stats:
-                    s, e = int(vs_starts[i]), int(vs_ends[i])
-                    t_u, t_c = np.unique(svt[s:e], return_counts=True)
-                    leaf_stats[unit_name]['venue_types'] = {
-                        str(k): int(cnt) for k, cnt in zip(t_u, t_c)
-                    }
-
-    # ── aggregate upward through hierarchy ───────────────────────────────────
-    all_stats = dict(leaf_stats)
-
-    def _add(dst: dict, src: dict) -> None:
-        dst['population'] = dst.get('population', 0) + src.get('population', 0)
-        for label in AGE_LABELS:
-            dst.setdefault('age_distribution', {})[label] = (
-                dst.get('age_distribution', {}).get(label, 0)
-                + src.get('age_distribution', {}).get(label, 0)
-            )
-        for sex, cnt in src.get('sex_distribution', {}).items():
-            dst.setdefault('sex_distribution', {})[sex] = (
-                dst.get('sex_distribution', {}).get(sex, 0) + cnt
-            )
-        for vt, cnt in src.get('venue_types', {}).items():
-            dst.setdefault('venue_types', {})[vt] = (
-                dst.get('venue_types', {}).get(vt, 0) + cnt
-            )
-
-    def _aggregate(unit) -> dict:
-        if not unit.children:
-            return all_stats.get(unit.name, {
-                'population': 0,
-                'age_distribution': {k: 0 for k in AGE_LABELS},
-                'sex_distribution': {},
-                'venue_types': {},
-            })
-        agg: dict = {
-            'population': 0,
-            'age_distribution': {k: 0 for k in AGE_LABELS},
-            'sex_distribution': {},
-            'venue_types': {},
-        }
-        if unit.name in leaf_stats:
-            _add(agg, leaf_stats[unit.name])
-        for child in unit.children:
-            _add(agg, _aggregate(child))
-        all_stats[unit.name] = agg
-        return agg
-
-    for unit in geography.units_by_id.values():
-        if unit.parent is None:
-            _aggregate(unit)
-
-    return {
-        name: UnitStats(
-            population=int(d['population']),
-            age_distribution={k: int(v) for k, v in d['age_distribution'].items()},
-            sex_distribution={str(k): int(v) for k, v in d['sex_distribution'].items()},
-            venue_types={str(k): int(v) for k, v in d.get('venue_types', {}).items()},
-        )
-        for name, d in all_stats.items()
-    }
-
-
 # ─── public entry point ───────────────────────────────────────────────────────
 
 def load_explorer_world(input_file):
@@ -403,7 +253,7 @@ def load_explorer_world(input_file):
             raise OSError("No geography data found in HDF5 file")
 
         geography       = _load_geography(f['geography'], geo_names, level_registry)
-        unit_statistics = _compute_explorer_unit_statistics(f, geography)
+        unit_statistics = compute_unit_statistics(f, geography, include_activity_counts=False)
 
         # lookup arrays (cheap; serve single-record lazy reads)
         person_ids       = f['population/ids'][:]
