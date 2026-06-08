@@ -1,4 +1,12 @@
-"""Shared pagination utility for list-based route handlers. App-agnostic."""
+"""Shared pagination utility for list-based route handlers. App-agnostic.
+
+Convention: `paginate`/`PaginationSlice` are for routes (and tests) that hold
+a fully materialised Python list. `RecordReader` (record_reader.py) instead
+hand-slices numpy arrays/HDF5 datasets and only reuses `calc_total_pages` —
+wrapping its results in `paginate` would force materialising full arrays just
+to re-slice them, defeating its lazy-read design. Both patterns are
+intentional; do not "unify" them onto one shape.
+"""
 
 from dataclasses import dataclass
 

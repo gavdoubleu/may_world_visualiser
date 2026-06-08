@@ -1,3 +1,10 @@
+"""Theme-to-CSS rendering and theme resolution shared by world_map and world_explorer."""
+
+from pathlib import Path
+
+import yaml
+
+
 def hex_to_rgb(hex_color: str) -> str:
     """Convert '#00d4ff' to '0, 212, 255'."""
     h = hex_color.lstrip('#')
@@ -48,3 +55,54 @@ def build_root_block(theme_config: dict) -> str:
     css_vars = build_css_vars(theme_config)
     lines = [f"    {k}: {v};" for k, v in css_vars.items()]
     return ":root {\n" + "\n".join(lines) + "\n}"
+
+
+def render_theme_css(theme_config: dict) -> str:
+    """Render a full theme.css body: @font-face rules (served from /static/fonts) + :root block."""
+    fonts = theme_config.get('fonts', {})
+
+    display_font = fonts.get('display', 'sans-serif')
+    body_font = fonts.get('body', 'sans-serif')
+    display_file = fonts.get('display_file', '')
+    body_file = fonts.get('body_file', '')
+
+    css_lines = []
+
+    if display_file:
+        css_lines.append(
+            f"@font-face {{\n"
+            f"    font-family: '{display_font}';\n"
+            f"    src: url('/static/fonts/{display_file}') format('woff2');\n"
+            f"    font-weight: normal;\n"
+            f"    font-style: normal;\n"
+            f"}}"
+        )
+    if body_file and body_file != display_file:
+        css_lines.append(
+            f"@font-face {{\n"
+            f"    font-family: '{body_font}';\n"
+            f"    src: url('/static/fonts/{body_file}') format('woff2');\n"
+            f"    font-weight: normal;\n"
+            f"    font-style: normal;\n"
+            f"}}"
+        )
+
+    css_lines.append(build_root_block(theme_config))
+
+    return "\n\n".join(css_lines)
+
+
+def resolve_theme(theme_ref: str, builtin_themes_dir: Path, config_dir: Path | None = None) -> dict:
+    """Resolve theme_ref to a YAML file and load it.
+
+    theme_ref is either a built-in name ('dark_scientific' — looked up in
+    builtin_themes_dir) or a path relative to config_dir ('./my_theme.yaml').
+    """
+    if theme_ref.endswith('.yaml') or '/' in theme_ref or '\\' in theme_ref:
+        if config_dir is None:
+            raise ValueError(f"theme_ref {theme_ref!r} is a path but no config_dir given")
+        theme_path = config_dir / theme_ref
+    else:
+        theme_path = builtin_themes_dir / f'{theme_ref}.yaml'
+    with open(theme_path) as f:
+        return yaml.safe_load(f) or {}

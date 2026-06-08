@@ -8,40 +8,38 @@ registered.
 """
 
 import logging
-from flask import Flask
-from flask_cors import CORS
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+_BUILTIN_THEMES_DIR = Path(__file__).parent.parent / 'world_map' / 'yaml' / 'themes'
+_DEFAULT_THEME = 'dark_scientific'
 
-def create_app(world, hdf5_path):
-    app = Flask(__name__,
-                template_folder='templates',
-                static_folder='static',
-                static_url_path='/static')
-    CORS(app)
 
+def create_app(world, hdf5_path, theme=None):
+    """Build the WorldExplorer Flask app.
+
+    theme: built-in theme name (e.g. 'dark_scientific', 'clean_minimal');
+        defaults to _DEFAULT_THEME, mirroring world_map's config-driven theme.
+    """
+    from webapp_utilities import make_app, resolve_theme
     from world_reader import RecordReader
     from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
+    from world_explorer.routes.explorer import explorer_bp
 
     record_reader = RecordReader(hdf5_path, world)
-    app.config[_EXPLORER_CTX_KEY] = ExplorerContext(
-        world=world,
-        record_reader=record_reader,
+    theme_dict = resolve_theme(theme or _DEFAULT_THEME, _BUILTIN_THEMES_DIR)
+    context = ExplorerContext(world=world, record_reader=record_reader, theme=theme_dict)
+
+    app = make_app(
+        __name__,
+        blueprints=[explorer_bp],
+        context=context,
+        context_key=_EXPLORER_CTX_KEY,
+        template_folder='templates',
+        static_folder='static',
+        static_url_path='/static',
     )
-
-    from world_explorer.routes.explorer import explorer_bp
-    app.register_blueprint(explorer_bp)
-
-    @app.errorhandler(404)
-    def not_found(error):
-        from flask import jsonify
-        return jsonify({'error': 'Not found'}), 404
-
-    @app.errorhandler(500)
-    def internal_error(error):
-        from flask import jsonify
-        return jsonify({'error': 'Internal server error'}), 500
 
     logger.info(f"WorldExplorer initialised: {world}")
     return app

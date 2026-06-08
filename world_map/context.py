@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from world_map.events.event_aggregator import EventAggregator
 
+from webapp_utilities import make_context_accessor
 from world_reader import WorldStore, RecordReader
 from world_map.projection.base import MapProjectionConfig
 from world_map.config import AppConfig
@@ -32,6 +33,4 @@ class AppContext:
         return self.app_config.geo_unit_names is not None
 
 
-def get_app_context() -> AppContext:
-    from flask import current_app
-    return current_app.config[_CTX_KEY]
+get_app_context = make_context_accessor(_CTX_KEY)

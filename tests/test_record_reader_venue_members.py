@@ -57,6 +57,7 @@ def explorer_client(venue_members_h5):
     app.config[_EXPLORER_CTX_KEY] = ExplorerContext(
         world=world,
         record_reader=loader,
+        theme={},
     )
     app.register_blueprint(explorer_bp)
     return app.test_client()
