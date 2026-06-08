@@ -47,7 +47,7 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
     g_starts = np.concatenate([[0], bounds])
     g_ends   = np.concatenate([bounds, [len(sg)]])
 
-    leaf_stats: dict = {}
+    direct_stats: dict = {}
     for i, geo_id in enumerate(sg[g_starts]):
         unit_name = uid_to_name.get(int(geo_id))
         if unit_name is None:
@@ -60,7 +60,7 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
             age_dist[label] = int(np.sum((sa[s:e] >= lo) & (sa[s:e] < hi)))
 
         sex_u, sex_c = np.unique(ss[s:e], return_counts=True)
-        leaf_stats[unit_name] = {
+        direct_stats[unit_name] = {
             'population':       int(e - s),
             'age_distribution': age_dist,
             'sex_distribution': {str(k): int(v) for k, v in zip(sex_u, sex_c)},
@@ -68,11 +68,21 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
             'activity_counts':  {},
         }
 
-    # ── venue type counts per leaf unit ──────────────────────────────────────
+    # ── venue type counts per directly-assigned unit (leaf or not) ───────────
+    # ChildVenues never appear in a unit's top-level venue list (they're only
+    # reachable by expanding their ParentVenue) — exclude them here too, or
+    # WorldExplorer renders an unreachable section that never finishes loading.
     if 'venues' in f:
         v           = f['venues']
         v_geo_ids   = v['geo_unit_ids'][:]
         types_raw   = v['types'][:] if 'types' in v else np.array([], dtype='u1')
+
+        num_venues_total = len(v_geo_ids)
+        v_parent_ids = (v['parent_ids'][:] if 'parent_ids' in v
+                        else np.full(num_venues_total, -1, dtype=np.int32))
+        top_level_mask = v_parent_ids == -1
+        v_geo_ids = v_geo_ids[top_level_mask]
+        types_raw = types_raw[top_level_mask]
 
         type_reg = None
         try:
@@ -97,12 +107,23 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
 
             for i, geo_id in enumerate(svg[vs_starts]):
                 unit_name = uid_to_name.get(int(geo_id))
-                if unit_name and unit_name in leaf_stats:
-                    s, e = int(vs_starts[i]), int(vs_ends[i])
-                    t_u, t_c = np.unique(svt[s:e], return_counts=True)
-                    leaf_stats[unit_name]['venue_types'] = {
-                        str(k): int(cnt) for k, cnt in zip(t_u, t_c)
-                    }
+                if not unit_name:
+                    continue
+                s, e = int(vs_starts[i]), int(vs_ends[i])
+                t_u, t_c = np.unique(svt[s:e], return_counts=True)
+                # Venues attach to any GeoUnit (leaf or not), independent of
+                # resident population — seed an entry for venue-only units
+                # rather than dropping their counts (they'd otherwise never
+                # be recovered by _aggregate).
+                direct_stats.setdefault(unit_name, {
+                    'population':       0,
+                    'age_distribution': {},
+                    'sex_distribution': {},
+                    'venue_types':      {},
+                    'activity_counts':  {},
+                })['venue_types'] = {
+                    str(k): int(cnt) for k, cnt in zip(t_u, t_c)
+                }
 
     # ── activity counts per leaf unit ────────────────────────────────────────
     if include_activity_counts:
@@ -136,13 +157,13 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
                     act_idx   = int(gas[ga_starts[k], 1])
                     count     = int(ga_ends[k] - ga_starts[k])
                     unit_name = uid_to_name.get(geo_id)
-                    if unit_name and unit_name in leaf_stats:
-                        leaf_stats[unit_name]['activity_counts'][
+                    if unit_name and unit_name in direct_stats:
+                        direct_stats[unit_name]['activity_counts'][
                             str(activity_names[act_idx])
                         ] = count
 
     # ── aggregate upward through hierarchy ───────────────────────────────────
-    all_stats = dict(leaf_stats)
+    all_stats = dict(direct_stats)
 
     def _add(dst: dict, src: dict) -> None:
         dst['population'] = dst.get('population', 0) + src.get('population', 0)
@@ -180,8 +201,8 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
             'venue_types': {},
             'activity_counts': {},
         }
-        if unit.name in leaf_stats:
-            _add(agg, leaf_stats[unit.name])
+        if unit.name in direct_stats:
+            _add(agg, direct_stats[unit.name])
         for child in unit.children:
             _add(agg, _aggregate(child))
         all_stats[unit.name] = agg

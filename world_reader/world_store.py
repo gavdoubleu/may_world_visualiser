@@ -70,7 +70,7 @@ class WorldStore:
                  venue_types_arr,
                  venue_type_names, venue_list_position, person_list_position,
                  venue_parent_ids=None, venue_child_counts=None,
-                 venue_child_total_members=None,
+                 venue_child_total_members=None, venue_child_position=None,
                  children_by_parent_sorted=None, children_parent_ids_sorted=None,
                  venue_ids=None, venue_id_to_idx=None):
         self.geography = geography
@@ -89,6 +89,7 @@ class WorldStore:
         self.venue_parent_ids             = venue_parent_ids
         self.venue_child_counts           = venue_child_counts
         self.venue_child_total_members    = venue_child_total_members
+        self.venue_child_position         = venue_child_position
         self.children_by_parent_sorted    = children_by_parent_sorted
         self.children_parent_ids_sorted   = children_parent_ids_sorted
         self.population = None
@@ -311,6 +312,17 @@ def build_world_store(input_file, compute_activity_stats: bool = False):
         if len(child_parent_ids):
             np.add.at(venue_child_counts, child_parent_ids, 1)
 
+        # rank of each ChildVenue within its ParentVenue's children list
+        # (same diff-grouping technique as _build_locate_indices: contiguous
+        # runs in the parent-sorted array get 0..n-1 via np.arange)
+        venue_child_position = np.zeros(num_venues, dtype=np.int32)
+        if len(children_parent_ids_sorted):
+            run_bounds  = np.where(np.diff(children_parent_ids_sorted) != 0)[0] + 1
+            run_starts  = np.concatenate([[0], run_bounds])
+            run_ends    = np.concatenate([run_bounds, [len(children_parent_ids_sorted)]])
+            for start, end in zip(run_starts, run_ends):
+                venue_child_position[children_by_parent_sorted[start:end]] = np.arange(end - start)
+
         # per-venue member total from subset member_counts
         venue_total_members = np.zeros(num_venues, dtype=np.int32)
         if 'venues/subsets/member_counts' in f and 'venues/subsets/venue_ids' in f:
@@ -338,6 +350,7 @@ def build_world_store(input_file, compute_activity_stats: bool = False):
         venue_parent_ids=venue_parent_ids,
         venue_child_counts=venue_child_counts,
         venue_child_total_members=venue_child_total_members,
+        venue_child_position=venue_child_position,
         children_by_parent_sorted=children_by_parent_sorted,
         children_parent_ids_sorted=children_parent_ids_sorted,
         venue_ids=venue_ids,

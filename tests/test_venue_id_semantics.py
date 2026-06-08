@@ -165,6 +165,20 @@ def test_locate_venue_resolves_logical_id(gapped_venues_loader):
     assert gapped_venues_loader.locate_venue(1, per_page=50) is None
 
 
+def test_locate_venue_resolves_child_venue_via_parent(gapped_venues_loader):
+    """Cellar (logical id 7) is a ChildVenue of Pub (logical id 10) — it never
+    appears in a unit's top-level venue list, so locate_venue must resolve
+    geo_unit/venue_type/page from Pub (the reachable ParentVenue section), and
+    additionally report parent_venue_id/child_page so the frontend can drill
+    straight to Cellar within Pub's expanded children list."""
+    cellar = gapped_venues_loader.locate_venue(7, per_page=50)
+    assert cellar['geo_unit'] == 'London'
+    assert cellar['venue_type'] == 'bar'        # Pub's type, not Cellar's own
+    assert cellar['page'] == 1
+    assert cellar['parent_venue_id'] == 10
+    assert cellar['child_page'] == 1
+
+
 def test_load_venue_members_resolves_logical_id(gapped_venues_loader):
     result = gapped_venues_loader.load_venue_members(10, page=1, per_page=50, subset_filter=None)
     assert result['venue_name'] == 'Pub'

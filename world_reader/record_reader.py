@@ -28,6 +28,7 @@ class RecordReader:
         self._venue_list_position = store.venue_list_position
         self._person_list_position = store.person_list_position
         self._venue_parent_ids           = store.venue_parent_ids
+        self._venue_child_position       = store.venue_child_position
         self._venue_child_counts         = store.venue_child_counts
         self._venue_child_total_members  = store.venue_child_total_members
         self._children_by_parent_sorted  = store.children_by_parent_sorted
@@ -446,23 +447,44 @@ class RecordReader:
     # the same pattern load_person_slim/load_unit_people use.
 
     def locate_venue(self, venue_id: int, per_page: int) -> dict | None:
-        """Return {geo_unit, venue_type, page} for venue_id, or None if invalid."""
+        """Return {geo_unit, venue_type, page} for venue_id, or None if invalid.
+
+        ChildVenues never appear in a unit's top-level venue list (only
+        reachable by expanding their ParentVenue) — for those, geo_unit/
+        venue_type/page describe the **parent's** reachable section, plus
+        parent_venue_id/child_page locate the target within the parent's
+        expanded children list.
+        """
         if self._venue_id_to_idx is None:
             return None
         row = int(self._venue_id_to_idx[venue_id])
         if row == IdIndex.MISSING:
             return None
+
+        result_row    = row
+        parent_extra  = {}
+        if self._venue_parent_ids is not None and self._venue_parent_ids[row] != -1:
+            parent_row = int(self._venue_parent_ids[row])
+            result_row = parent_row
+            child_position = (int(self._venue_child_position[row])
+                              if self._venue_child_position is not None else 0)
+            parent_extra = {
+                'parent_venue_id': int(self._venue_ids[parent_row]),
+                'child_page':      child_position // per_page + 1,
+            }
+
         with h5py.File(self._hdf5_path, 'r') as f:
-            geo_id = int(f['venues/geo_unit_ids'][row])
+            geo_id = int(f['venues/geo_unit_ids'][result_row])
         unit       = self._geography.units_by_id.get(geo_id)
-        type_code  = int(self._venue_types_arr[row])
+        type_code  = int(self._venue_types_arr[result_row])
         venue_type = (self._venue_type_names_cache[type_code]
                       if type_code < len(self._venue_type_names_cache) else 'unknown')
-        position   = int(self._venue_list_position[row])
+        position   = int(self._venue_list_position[result_row])
         return {
             'geo_unit':   unit.name if unit else None,
             'venue_type': venue_type,
             'page':       position // per_page + 1,
+            **parent_extra,
         }
 
     def locate_person(self, person_id: int, per_page: int) -> dict | None:

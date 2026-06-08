@@ -19,6 +19,9 @@ const state = {
   highlightVenueId:  null,
   highlightVenueType: null,
   highlightVenuePage: null,
+  highlightParentVenueId: null,
+  highlightChildVenueId:  null,
+  highlightChildPage:     null,
   targetPeoplePage:   null,
 
   mainHistory:    [],   // [{unit}], max 10
@@ -429,22 +432,41 @@ function renderVenuesSection() {
 
   // Auto-highlight target venue after navigation
   if (state.highlightVenueId && state.highlightVenueType) {
-    const targetType = state.highlightVenueType;
-    const targetId   = state.highlightVenueId;
-    const targetPage = state.highlightVenuePage || 1;
-    state.highlightVenueId   = null;
-    state.highlightVenueType = null;
-    state.highlightVenuePage = null;
+    const targetType      = state.highlightVenueType;
+    const targetId        = state.highlightVenueId;
+    const targetPage      = state.highlightVenuePage || 1;
+    const childId         = state.highlightChildVenueId;
+    const childPage       = state.highlightChildPage || 1;
+    state.highlightVenueId       = null;
+    state.highlightVenueType     = null;
+    state.highlightVenuePage     = null;
+    state.highlightParentVenueId = null;
+    state.highlightChildVenueId  = null;
+    state.highlightChildPage     = null;
 
-    const vs = state.venueStates[targetType] || { open: false, page: 1, items: [], total: 0 };
+    const vs = state.venueStates[targetType] || { open: false, page: 1, items: [], total: 0, loading: true };
     vs.open = true;
     state.venueStates[targetType] = vs;
     renderVenuesSection();
     fetchVenuePage(state.selectedUnit, targetType, targetPage).then(() => {
       const vs2 = state.venueStates[targetType];
-      if (vs2 && vs2.items.length > 0) {
-        state.expandedVenueId = targetId;
+      if (!vs2 || vs2.items.length === 0) return;
+      state.expandedVenueId = targetId;
+      renderVenuesSection();
+
+      if (childId) {
+        // ChildVenue target: expand the parent's children list, page to it,
+        // then highlight the child within
+        const cs = state.childrenStates[targetId] || { open: true, page: 1, items: [], total: 0, totalPages: 1, loading: true };
+        state.childrenStates[targetId] = cs;
         renderVenuesSection();
+        fetchVenueChildren(targetId, childPage).then(() => {
+          state.expandedChildVenueId = childId;
+          renderVenuesSection();
+          document.querySelector(`[data-venue-id="${childId}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      } else {
         document.querySelector(`[data-venue-id="${targetId}"]`)
           ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
@@ -454,7 +476,8 @@ function renderVenuesSection() {
 
 function buildVenueListHtml(type, vs) {
   if (vs.items.length === 0) {
-    return '<div style="padding:0.6rem 1rem;font-size:0.8rem;color:var(--theme-text-muted)">Loading…</div>';
+    const message = vs.loading ? 'Loading…' : 'No venues found.';
+    return `<div style="padding:0.6rem 1rem;font-size:0.8rem;color:var(--theme-text-muted)">${message}</div>`;
   }
 
   const itemsHtml = vs.items.map(v => {
@@ -614,7 +637,7 @@ async function handleVenueClick(e) {
 
   if (toggleGroup) {
     const type = toggleGroup.dataset.type;
-    const vs = state.venueStates[type] || { open: false, page: 1, items: [], total: 0 };
+    const vs = state.venueStates[type] || { open: false, page: 1, items: [], total: 0, loading: true };
     vs.open = !vs.open;
     state.venueStates[type] = vs;
     if (vs.open && vs.items.length === 0) {
@@ -694,6 +717,7 @@ async function handleVenueClick(e) {
 
 async function fetchVenuePage(unitName, type, page) {
   const vs = state.venueStates[type] || { open: true, page: 1, items: [], total: 0 };
+  vs.loading = true;
   state.venueStates[type] = vs;
   renderVenuesSection();
 
@@ -707,9 +731,11 @@ async function fetchVenuePage(unitName, type, page) {
     vs.totalPages = data.total_pages;
     vs.page       = page;
     vs.per_page   = data.per_page;
+    vs.loading    = false;
   } catch (err) {
-    vs.items = [];
-    vs.total = 0;
+    vs.items   = [];
+    vs.total   = 0;
+    vs.loading = false;
   }
   renderVenuesSection();
 }
@@ -1276,8 +1302,19 @@ async function goToVenue(venueId) {
     console.error('Failed to locate venue:', err);
     return;
   }
-  state.highlightVenueId   = venueId;
-  state.highlightVenueType = location.venue_type;
-  state.highlightVenuePage = location.page;
+  if (location.parent_venue_id) {
+    // ChildVenue: geo_unit/venue_type/page describe the reachable
+    // ParentVenue's section — drill into it, then highlight the child
+    state.highlightVenueId       = location.parent_venue_id;
+    state.highlightVenueType     = location.venue_type;
+    state.highlightVenuePage     = location.page;
+    state.highlightParentVenueId = location.parent_venue_id;
+    state.highlightChildVenueId  = venueId;
+    state.highlightChildPage     = location.child_page;
+  } else {
+    state.highlightVenueId   = venueId;
+    state.highlightVenueType = location.venue_type;
+    state.highlightVenuePage = location.page;
+  }
   await loadUnit(location.geo_unit);
 }
