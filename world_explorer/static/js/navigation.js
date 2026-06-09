@@ -1,100 +1,30 @@
-'use strict';
+import { state } from './state.js';
 
-// Cross-navigation helpers — depend on state, fetchJson, loadUnit, PAGE_SIZE, esc
-// from app.js (loaded first).
-
-function showSearchError(errorEl, message) {
-  errorEl.textContent = message;
-  errorEl.removeAttribute('hidden');
-  clearTimeout(errorEl._dismissTimer);
-  errorEl._dismissTimer = setTimeout(() => errorEl.setAttribute('hidden', ''), 3000);
+export function pushMainHistory(unitId) {
+  state.mainHistory = state.mainHistory.slice(0, state.mainHistoryIdx + 1);
+  state.mainHistory.push({ unit: unitId });
+  if (state.mainHistory.length > 10) state.mainHistory.shift();
+  state.mainHistoryIdx = state.mainHistory.length - 1;
+  updateMainNavButtons();
 }
 
-async function performGeoUnitSearch(query, errorEl, dropdownEl) {
-  dropdownEl.setAttribute('hidden', '');
-  dropdownEl.innerHTML = '';
-  if (!query.trim()) return;
-  let results;
-  try {
-    results = await fetchJson(`/api/explorer/geo_unit/search?name=${encodeURIComponent(query)}`);
-  } catch {
-    showSearchError(errorEl, 'Search failed');
-    return;
-  }
-  if (results.length === 0) {
-    showSearchError(errorEl, 'Not found');
-    return;
-  }
-  if (results.length === 1) {
-    goToGeoUnit(results[0].id);
-    return;
-  }
-  dropdownEl.innerHTML = results.map(r =>
-    `<li data-unit-id="${r.id}">${esc(r.name)} · ${esc(r.level)}${r.parent_name ? ' · ' + esc(r.parent_name) : ''}</li>`
-  ).join('');
-  dropdownEl.removeAttribute('hidden');
-  dropdownEl.addEventListener('click', e => {
-    const li = e.target.closest('li[data-unit-id]');
-    if (!li) return;
-    dropdownEl.setAttribute('hidden', '');
-    goToGeoUnit(Number(li.dataset.unitId));
-  }, { once: true });
+export function updateMainNavButtons() {
+  const back = document.getElementById('nav-back-btn');
+  const fwd  = document.getElementById('nav-fwd-btn');
+  if (back) back.disabled = state.mainHistoryIdx <= 0;
+  if (fwd)  fwd.disabled  = state.mainHistoryIdx >= state.mainHistory.length - 1;
 }
 
-async function goToPerson(personId) {
-  let location;
-  try {
-    location = await fetchJson(`/api/explorer/person/${personId}/locate?per_page=${PAGE_SIZE}`);
-  } catch (err) {
-    return null;
-  }
-  if (!location.geo_unit_id) return null;
-  state.highlightPersonId = personId;
-  state.targetPeoplePage  = location.page;
-  await loadUnit(location.geo_unit_id);
-  return location;
+export function pushPanelHistory(entry) {
+  state.panelStack = state.panelStack.slice(0, state.panelStackIdx + 1);
+  state.panelStack.push(entry);
+  state.panelStackIdx = state.panelStack.length - 1;
+  updatePanelNavButtons();
 }
 
-async function goToVenue(venueId) {
-  let location;
-  try {
-    location = await fetchJson(`/api/explorer/venue/${venueId}/locate?per_page=${PAGE_SIZE}`);
-  } catch (err) {
-    return null;
-  }
-  if (!location.geo_unit_id) return null;
-  if (location.parent_venue_id) {
-    state.highlightVenueId       = location.parent_venue_id;
-    state.highlightVenueType     = location.venue_type;
-    state.highlightVenuePage     = location.page;
-    state.highlightParentVenueId = location.parent_venue_id;
-    state.highlightChildVenueId  = venueId;
-    state.highlightChildPage     = location.child_page;
-  } else {
-    state.highlightVenueId   = venueId;
-    state.highlightVenueType = location.venue_type;
-    state.highlightVenuePage = location.page;
-  }
-  await loadUnit(location.geo_unit_id);
-  return location;
-}
-
-async function goToGeoUnit(unitId) {
-  // Expand all ancestors of the target node in the tree, then navigate.
-  const node = state.nodeMap[unitId];
-  if (!node) return;
-
-  let ancestor = state.nodeMap[node.parent_id];
-  while (ancestor) {
-    state.expandedIds.add(ancestor.id);
-    ancestor = state.nodeMap[ancestor.parent_id];
-  }
-
-  await loadUnit(unitId);
-
-  // Scroll the selected tree node into view after render.
-  requestAnimationFrame(() => {
-    document.querySelector(`[data-unit-id="${unitId}"][data-action="select"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
+export function updatePanelNavButtons() {
+  const back = document.getElementById('panel-back-btn');
+  const fwd  = document.getElementById('panel-fwd-btn');
+  if (back) back.disabled = state.panelStackIdx <= 0;
+  if (fwd)  fwd.disabled  = state.panelStackIdx >= state.panelStack.length - 1;
 }
