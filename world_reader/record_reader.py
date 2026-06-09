@@ -195,6 +195,18 @@ class RecordReader:
         """Per-level counts of people by their direct geo unit (precomputed at launch)."""
         return self._geographical_distribution
 
+    def get_venue_type_counts(self) -> dict:
+        """Venue counts keyed by type name."""
+        from .statistics import compute_venue_type_counts
+        return compute_venue_type_counts(self._venue_types_arr, self._venue_type_names_cache)
+
+    def get_venue_type_names_present(self) -> list:
+        """Insertion-order list of VenueType names that have at least one venue."""
+        if self._venue_types_arr is None:
+            return []
+        from .statistics import venue_type_names_present
+        return venue_type_names_present(self._venue_types_arr, self._venue_type_names_cache)
+
     # ── slim detail / list reads (no in-memory Person/Venue objects) ─────────────
 
     def load_person_slim(self, person_id: int) -> dict | None:

@@ -7,7 +7,7 @@ from flask import Blueprint, Response, jsonify, render_template, request, send_f
 
 from world_explorer.context import get_explorer_context
 from webapp_utilities.theme_css import render_theme_css
-from world_map.utils import convert_numpy_types
+from world_reader.convert import convert_numpy_types
 
 logger = logging.getLogger(__name__)
 

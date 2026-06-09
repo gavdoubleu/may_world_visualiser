@@ -6,7 +6,6 @@ import logging
 from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
 from world_map.geojson import point_feature, feature_collection
-from world_reader.statistics import compute_venue_type_counts, venue_type_names_present
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +16,7 @@ venues_bp = Blueprint('venues', __name__)
 def get_venue_types():
     """Get all available venue types and their counts."""
     try:
-        world = get_app_context().world
-        types = compute_venue_type_counts(world.venue_types_arr, world.venue_type_names)
+        types = get_app_context().record_reader.get_venue_type_counts()
         return jsonify({'types': types})
 
     except Exception as e:
@@ -105,11 +103,10 @@ def get_world_statistics():
         if world.geography:
             stats['total_geo_units'] = len(world.geography.units_by_id)
             stats['geography_levels'] = world.geography.levels
-        if world.venue_types_arr is not None:
+        venue_type_names = ctx.record_reader.get_venue_type_names_present()
+        if venue_type_names:
             stats['total_venues'] = int(len(world.venue_types_arr))
-            stats['venue_types'] = venue_type_names_present(
-                world.venue_types_arr, world.venue_type_names
-            )
+            stats['venue_types'] = venue_type_names
 
         # Merge in slim-mode aggregate statistics if available
         slim_stats = getattr(world, '_slim_statistics', None)
