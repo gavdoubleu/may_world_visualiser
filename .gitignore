@@ -9,3 +9,4 @@ log*.txt
 *.pyc
 log*.txt
 tmp/
+node_modules/
