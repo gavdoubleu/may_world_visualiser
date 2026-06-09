@@ -1,4 +1,5 @@
 *~
+#*#
 CLAUDE.md
 .worktrees/
 data/
@@ -7,6 +8,8 @@ data/
 outputs/
 log*.txt
 *.pyc
+__pycache__/
 log*.txt
 tmp/
 node_modules/
+graphify-out/
