@@ -15,6 +15,20 @@
         <img src="/static/images/May_world_explorer_light_logo.svg" alt="World Explorer" class="header-logo">
       </div>
       <div id="header-stats" class="header-stats">Loading…</div>
+      <div id="header-search">
+        <input id="header-search-input" class="search-input" type="text" placeholder="Search geo unit, person, or venue…" autocomplete="off">
+        <button id="header-search-geo-btn" class="icon-btn" title="Go to geo unit">
+          <img src="/static/images/to_geo_unit_icon.svg" alt="Go to geo unit">
+        </button>
+        <button id="header-search-person-btn" class="icon-btn" title="Go to person">
+          <img src="/static/images/to_person_logo.svg" alt="Go to person">
+        </button>
+        <button id="header-search-venue-btn" class="icon-btn" title="Go to venue">
+          <img src="/static/images/to_venue_logo.svg" alt="Go to venue">
+        </button>
+        <div id="header-search-error" class="search-error" hidden></div>
+        <ul id="header-search-dropdown" class="search-dropdown" hidden></ul>
+      </div>
     </header>
 
     <div id="main">
@@ -23,14 +37,6 @@
         <div class="pane-header">Geography</div>
         <div id="tree-scroll">
           <ul id="geo-tree" class="tree-root"></ul>
-        </div>
-        <div id="tree-search-bar">
-          <input id="tree-search-input" class="search-input" type="text" placeholder="Find geo unit…" autocomplete="off">
-          <button id="tree-search-btn" class="icon-btn" title="Go to geo unit">
-            <img src="/static/images/to_geo_unit_icon.svg" alt="Go to geo unit">
-          </button>
-          <div id="tree-search-error" class="search-error" hidden></div>
-          <ul id="tree-search-dropdown" class="search-dropdown" hidden></ul>
         </div>
       </div>
 
@@ -62,17 +68,6 @@
       </div>
 
     </div>
-  </div>
-
-  <div id="id-search-bar">
-    <input id="id-search-input" class="search-input" type="text" placeholder="Person or venue ID…" autocomplete="off">
-    <button id="id-search-person-btn" class="icon-btn" title="Go to person">
-      <img src="/static/images/to_person_logo.svg" alt="Go to person">
-    </button>
-    <button id="id-search-venue-btn" class="icon-btn" title="Go to venue">
-      <img src="/static/images/to_venue_logo.svg" alt="Go to venue">
-    </button>
-    <div id="id-search-error" class="search-error" hidden></div>
   </div>
 
   <script src="/static/js/app.js"></script>

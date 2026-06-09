@@ -24,7 +24,7 @@ html, body { height: 100%; overflow: hidden; }
 
 #app {
   display: grid;
-  grid-template-rows: 52px 1fr auto;
+  grid-template-rows: 52px 1fr;
   height: 100vh;
   background: var(--theme-bg);
   color: var(--theme-text);
@@ -663,31 +663,18 @@ tr.person-expand-row td {
 }
 .icon-btn:hover img { filter: brightness(0) invert(1); }
 
-/* ── search bars ─────────────────────────────────────────────────────────────── */
+/* ── header search ────────────────────────────────────────────────────────────── */
 
-#tree-search-bar {
-  flex-shrink: 0;
-  border-top: 1px solid var(--theme-border);
-  padding: 0.4rem 0.5rem;
+#header-search {
   display: flex;
   align-items: center;
   gap: 0.3rem;
   position: relative;
-}
-
-#id-search-bar {
-  flex-shrink: 0;
-  border-top: 1px solid var(--theme-border);
-  padding: 0.35rem 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: var(--theme-surface);
-  position: relative;
+  margin-left: 1rem;
 }
 
 .search-input {
-  flex: 1;
+  width: 220px;
   background: var(--theme-bg);
   border: 1px solid var(--theme-border);
   border-radius: 4px;
@@ -701,8 +688,8 @@ tr.person-expand-row td {
 
 .search-error {
   position: absolute;
-  bottom: calc(100% + 4px);
-  left: 0.5rem;
+  top: calc(100% + 6px);
+  right: 0;
   background: #1a2a4a;
   color: #fff;
   font-size: 0.75rem;
@@ -715,15 +702,15 @@ tr.person-expand-row td {
 
 .search-dropdown {
   position: absolute;
-  bottom: calc(100% + 4px);
-  left: 0.5rem;
-  right: 0.5rem;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
   background: var(--theme-surface);
   border: 1px solid var(--theme-border);
   border-radius: 4px;
   list-style: none;
   z-index: 100;
-  max-height: 180px;
+  max-height: 220px;
   overflow-y: auto;
 }
 .search-dropdown li {
