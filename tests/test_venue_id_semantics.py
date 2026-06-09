@@ -154,11 +154,11 @@ def test_load_venue_children_returns_logical_ids(gapped_venues_loader):
 
 def test_locate_venue_resolves_logical_id(gapped_venues_loader):
     pub = gapped_venues_loader.locate_venue(10, per_page=50)
-    assert pub['geo_unit'] == 'London'
+    assert pub['geo_unit_id'] == 0  # London has geo_id 0
     assert pub['venue_type'] == 'bar'
 
     school = gapped_venues_loader.locate_venue(25, per_page=50)
-    assert school['geo_unit'] == 'Camden'
+    assert school['geo_unit_id'] == 1  # Camden has geo_id 1
     assert school['venue_type'] == 'education'
 
     # row index 1 is not a valid logical ID here (smallest logical id is 7)
@@ -168,11 +168,11 @@ def test_locate_venue_resolves_logical_id(gapped_venues_loader):
 def test_locate_venue_resolves_child_venue_via_parent(gapped_venues_loader):
     """Cellar (logical id 7) is a ChildVenue of Pub (logical id 10) — it never
     appears in a unit's top-level venue list, so locate_venue must resolve
-    geo_unit/venue_type/page from Pub (the reachable ParentVenue section), and
+    geo_unit_id/venue_type/page from Pub (the reachable ParentVenue section), and
     additionally report parent_venue_id/child_page so the frontend can drill
     straight to Cellar within Pub's expanded children list."""
     cellar = gapped_venues_loader.locate_venue(7, per_page=50)
-    assert cellar['geo_unit'] == 'London'
+    assert cellar['geo_unit_id'] == 0  # London has geo_id 0
     assert cellar['venue_type'] == 'bar'        # Pub's type, not Cellar's own
     assert cellar['page'] == 1
     assert cellar['parent_venue_id'] == 10
@@ -192,8 +192,9 @@ def test_load_venue_members_resolves_logical_id(gapped_venues_loader):
 
 
 def test_load_unit_venues_returns_logical_ids(gapped_venues_loader):
-    london = gapped_venues_loader.load_unit_venues('London', page=1, per_page=50, type_filter=None)
+    # London=geo_id 0, Camden=geo_id 1 (hardcoded in gapped_venues_h5 fixture)
+    london = gapped_venues_loader.load_unit_venues(0, page=1, per_page=50, type_filter=None)
     assert {venue['id'] for venue in london['venues']} == {10, 25}  # Camden is London's subtree
 
-    camden = gapped_venues_loader.load_unit_venues('Camden', page=1, per_page=50, type_filter=None)
+    camden = gapped_venues_loader.load_unit_venues(1, page=1, per_page=50, type_filter=None)
     assert [venue['id'] for venue in camden['venues']] == [25]

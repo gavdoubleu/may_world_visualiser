@@ -31,8 +31,6 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
     else:
         sexes = sex_raw.astype(str)
 
-    uid_to_name = {uid: u.name for uid, u in geography.units_by_id.items()}
-
     AGE_BREAKS_NP = AGE_BREAKS[:-1] + [np.inf]
 
     if len(person_geo_ids) == 0:
@@ -49,8 +47,8 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
 
     direct_stats: dict = {}
     for i, geo_id in enumerate(sg[g_starts]):
-        unit_name = uid_to_name.get(int(geo_id))
-        if unit_name is None:
+        unit_id = int(geo_id)
+        if unit_id not in geography.units_by_id:
             continue
         s, e = int(g_starts[i]), int(g_ends[i])
 
@@ -60,7 +58,7 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
             age_dist[label] = int(np.sum((sa[s:e] >= lo) & (sa[s:e] < hi)))
 
         sex_u, sex_c = np.unique(ss[s:e], return_counts=True)
-        direct_stats[unit_name] = {
+        direct_stats[unit_id] = {
             'population':       int(e - s),
             'age_distribution': age_dist,
             'sex_distribution': {str(k): int(v) for k, v in zip(sex_u, sex_c)},
@@ -106,8 +104,8 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
             vs_ends   = np.concatenate([vb, [len(svg)]])
 
             for i, geo_id in enumerate(svg[vs_starts]):
-                unit_name = uid_to_name.get(int(geo_id))
-                if not unit_name:
+                unit_id = int(geo_id)
+                if unit_id not in geography.units_by_id:
                     continue
                 s, e = int(vs_starts[i]), int(vs_ends[i])
                 t_u, t_c = np.unique(svt[s:e], return_counts=True)
@@ -115,7 +113,7 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
                 # resident population — seed an entry for venue-only units
                 # rather than dropping their counts (they'd otherwise never
                 # be recovered by _aggregate).
-                direct_stats.setdefault(unit_name, {
+                direct_stats.setdefault(unit_id, {
                     'population':       0,
                     'age_distribution': {},
                     'sex_distribution': {},
@@ -153,12 +151,11 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
                 ga_ends   = np.concatenate([ga_b, [len(gas)]])
 
                 for k in range(len(ga_starts)):
-                    geo_id    = int(gas[ga_starts[k], 0])
-                    act_idx   = int(gas[ga_starts[k], 1])
-                    count     = int(ga_ends[k] - ga_starts[k])
-                    unit_name = uid_to_name.get(geo_id)
-                    if unit_name and unit_name in direct_stats:
-                        direct_stats[unit_name]['activity_counts'][
+                    unit_id = int(gas[ga_starts[k], 0])
+                    act_idx = int(gas[ga_starts[k], 1])
+                    count   = int(ga_ends[k] - ga_starts[k])
+                    if unit_id in direct_stats:
+                        direct_stats[unit_id]['activity_counts'][
                             str(activity_names[act_idx])
                         ] = count
 
@@ -187,7 +184,7 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
 
     def _aggregate(unit) -> dict:
         if not unit.children:
-            return all_stats.get(unit.name, {
+            return all_stats.get(unit.id, {
                 'population': 0,
                 'age_distribution': {k: 0 for k in AGE_LABELS},
                 'sex_distribution': {},
@@ -201,11 +198,11 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
             'venue_types': {},
             'activity_counts': {},
         }
-        if unit.name in direct_stats:
-            _add(agg, direct_stats[unit.name])
+        if unit.id in direct_stats:
+            _add(agg, direct_stats[unit.id])
         for child in unit.children:
             _add(agg, _aggregate(child))
-        all_stats[unit.name] = agg
+        all_stats[unit.id] = agg
         return agg
 
     for unit in geography.units_by_id.values():
@@ -213,14 +210,14 @@ def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> d
             _aggregate(unit)
 
     return {
-        name: UnitStats(
+        unit_id: UnitStats(
             population=int(d['population']),
             age_distribution={k: int(v) for k, v in d['age_distribution'].items()},
             sex_distribution={str(k): int(v) for k, v in d['sex_distribution'].items()},
             venue_types={str(k): int(v) for k, v in d.get('venue_types', {}).items()},
             activity_counts={str(k): int(v) for k, v in d.get('activity_counts', {}).items()},
         )
-        for name, d in all_stats.items()
+        for unit_id, d in all_stats.items()
     }
 
 

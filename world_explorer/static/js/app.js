@@ -70,9 +70,9 @@ async function fetchJson(url) {
 
 // ── main window history ────────────────────────────────────────────────────────
 
-function pushMainHistory(unitName) {
+function pushMainHistory(unitId) {
   state.mainHistory = state.mainHistory.slice(0, state.mainHistoryIdx + 1);
-  state.mainHistory.push({ unit: unitName });
+  state.mainHistory.push({ unit: unitId });
   if (state.mainHistory.length > 10) state.mainHistory.shift();
   state.mainHistoryIdx = state.mainHistory.length - 1;
   updateMainNavButtons();
@@ -182,14 +182,14 @@ function renderNodeList(nodes, depth) {
 function renderNode(node, depth) {
   const hasChildren = node.children.length > 0;
   const isExpanded  = state.expandedIds.has(node.id);
-  const isSelected  = state.selectedUnit === node.name;
+  const isSelected  = state.selectedUnit === node.id;
   const indent      = (0.5 + depth * 0.9) + 'rem';
 
   return `
     <li class="tree-node">
       <div class="tree-node__row${isSelected ? ' selected' : ''}"
            style="padding-left:${indent}"
-           data-action="select" data-name="${esc(node.name)}">
+           data-action="select" data-unit-id="${node.id}">
         <span class="tree-toggle"
               data-action="toggle" data-id="${node.id}"
               style="pointer-events:${hasChildren ? 'auto' : 'none'}">
@@ -219,7 +219,7 @@ function handleTreeClick(e) {
     }
     rerenderTree();
   } else if (selectEl) {
-    loadUnit(selectEl.dataset.name);
+    loadUnit(Number(selectEl.dataset.unitId));
   }
 }
 
@@ -230,13 +230,13 @@ function rerenderTree() {
 
 // ── unit loading ───────────────────────────────────────────────────────────────
 
-async function loadUnit(name, { pushHistory = true } = {}) {
-  if (state.selectedUnit === name && pushHistory &&
+async function loadUnit(unitId, { pushHistory = true } = {}) {
+  if (state.selectedUnit === unitId && pushHistory &&
       !state.highlightPersonId && !state.highlightVenueId) return;
 
-  if (pushHistory) pushMainHistory(name);
+  if (pushHistory) pushMainHistory(unitId);
 
-  state.selectedUnit        = name;
+  state.selectedUnit        = unitId;
   state.currentUnit         = null;
   state.venueStates         = {};
   state.expandedVenueId     = null;
@@ -254,7 +254,7 @@ async function loadUnit(name, { pushHistory = true } = {}) {
   setDetailLoading();
 
   try {
-    state.currentUnit = await fetchJson(`/api/explorer/unit/${encodeURIComponent(name)}`);
+    state.currentUnit = await fetchJson(`/api/explorer/unit/${unitId}`);
   } catch (err) {
     detail.innerHTML = `<div style="padding:2rem;color:var(--theme-text-muted)">Error: ${esc(err.message)}</div>`;
     return;
@@ -266,7 +266,7 @@ async function loadUnit(name, { pushHistory = true } = {}) {
   renderVenuesSection();
   renderPeopleSectionShell(state.currentUnit);
 
-  loadPeople(name, 1);
+  loadPeople(unitId, 1);
 }
 
 function setDetailLoading() {
@@ -280,7 +280,7 @@ function setDetailLoading() {
 
 function renderUnitHeader(unit) {
   const parentHtml = unit.parent
-    ? `<span class="parent-link" data-action="select-unit" data-name="${esc(unit.parent.name)}">
+    ? `<span class="parent-link" data-action="select-unit" data-unit-id="${unit.parent.id}">
          ↑ <span>${esc(unit.parent.name)}</span>
        </span>`
     : '';
@@ -293,7 +293,7 @@ function renderUnitHeader(unit) {
 
   document.getElementById('unit-title-row').addEventListener('click', (e) => {
     const el = e.target.closest('[data-action="select-unit"]');
-    if (el) loadUnit(el.dataset.name);
+    if (el) loadUnit(Number(el.dataset.unitId));
   });
 }
 
@@ -409,7 +409,7 @@ function renderVenuesSection() {
     const type  = input.dataset.type;
     const total = Number(input.dataset.total);
     const page  = Math.max(1, Math.min(Number(input.value), total));
-    if (type && page) await fetchVenuePage(state.selectedUnit, type, page);
+    if (type && page) await fetchVenuePage(state.selectedUnit, type, page);  // selectedUnit is now unitId
   };
   const jumpToChildrenPage = async (input) => {
     const parentId = Number(input.dataset.parentId);
@@ -448,7 +448,7 @@ function renderVenuesSection() {
     vs.open = true;
     state.venueStates[targetType] = vs;
     renderVenuesSection();
-    fetchVenuePage(state.selectedUnit, targetType, targetPage).then(() => {
+    fetchVenuePage(state.selectedUnit, targetType, targetPage).then(() => {  // selectedUnit is unitId
       const vs2 = state.venueStates[targetType];
       if (!vs2 || vs2.items.length === 0) return;
       state.expandedVenueId = targetId;
@@ -715,7 +715,7 @@ async function handleVenueClick(e) {
   }
 }
 
-async function fetchVenuePage(unitName, type, page) {
+async function fetchVenuePage(unitId, type, page) {
   const vs = state.venueStates[type] || { open: true, page: 1, items: [], total: 0 };
   vs.loading = true;
   state.venueStates[type] = vs;
@@ -723,7 +723,7 @@ async function fetchVenuePage(unitName, type, page) {
 
   try {
     const data = await fetchJson(
-      `/api/explorer/unit/${encodeURIComponent(unitName)}/venues` +
+      `/api/explorer/unit/${unitId}/venues` +
       `?type=${encodeURIComponent(type)}&page=${page}&per_page=${PAGE_SIZE}`
     );
     vs.items      = data.venues;
@@ -779,7 +779,7 @@ function renderPeopleSectionShell(unit) {
   bindPeopleEvents();
 }
 
-async function loadPeople(unitName, page) {
+async function loadPeople(unitId, page) {
   state.expandedPersonId = null;
 
   // Locate endpoint gives us the exact page; use it if available.
@@ -797,7 +797,7 @@ async function loadPeople(unitName, page) {
   let data;
   try {
     data = await fetchJson(
-      `/api/explorer/unit/${encodeURIComponent(unitName)}/people` +
+      `/api/explorer/unit/${unitId}/people` +
       `?page=${page}&per_page=${PAGE_SIZE}`
     );
   } catch (err) {
@@ -1280,41 +1280,4 @@ async function handlePanelClick(e) {
 }
 
 // ── cross-navigation ──────────────────────────────────────────────────────────
-
-async function goToPerson(personId) {
-  let location;
-  try {
-    location = await fetchJson(`/api/explorer/person/${personId}/locate?per_page=${PAGE_SIZE}`);
-  } catch (err) {
-    console.error('Failed to locate person:', err);
-    return;
-  }
-  state.highlightPersonId = personId;
-  state.targetPeoplePage  = location.page;
-  await loadUnit(location.geo_unit);
-}
-
-async function goToVenue(venueId) {
-  let location;
-  try {
-    location = await fetchJson(`/api/explorer/venue/${venueId}/locate?per_page=${PAGE_SIZE}`);
-  } catch (err) {
-    console.error('Failed to locate venue:', err);
-    return;
-  }
-  if (location.parent_venue_id) {
-    // ChildVenue: geo_unit/venue_type/page describe the reachable
-    // ParentVenue's section — drill into it, then highlight the child
-    state.highlightVenueId       = location.parent_venue_id;
-    state.highlightVenueType     = location.venue_type;
-    state.highlightVenuePage     = location.page;
-    state.highlightParentVenueId = location.parent_venue_id;
-    state.highlightChildVenueId  = venueId;
-    state.highlightChildPage     = location.child_page;
-  } else {
-    state.highlightVenueId   = venueId;
-    state.highlightVenueType = location.venue_type;
-    state.highlightVenuePage = location.page;
-  }
-  await loadUnit(location.geo_unit);
-}
+// goToPerson, goToVenue, goToGeoUnit are defined in navigation.js (loaded after this file).

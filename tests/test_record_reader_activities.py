@@ -147,21 +147,24 @@ def subtree_loader(subtree_world_h5):
 
 
 def test_load_unit_people_includes_descendants(subtree_loader):
-    _, loader = subtree_loader
+    world, loader = subtree_loader
+    london_id = world.geography.get_unit('London').id
+    camden_id = world.geography.get_unit('Camden').id
     # London subtree = London(2) + Camden(1) = 3 people
-    london = loader.load_unit_people('London', page=1, per_page=50)
+    london = loader.load_unit_people(london_id, page=1, per_page=50)
     assert london['total_count'] == 3
     assert {p['id'] for p in london['people']} == {0, 1, 2}
     # Camden alone = 1 person
-    camden = loader.load_unit_people('Camden', page=1, per_page=50)
+    camden = loader.load_unit_people(camden_id, page=1, per_page=50)
     assert camden['total_count'] == 1
     assert camden['people'][0]['id'] == 2
 
 
 def test_load_unit_people_pagination(subtree_loader):
-    _, loader = subtree_loader
-    page1 = loader.load_unit_people('London', page=1, per_page=2)
-    page2 = loader.load_unit_people('London', page=2, per_page=2)
+    world, loader = subtree_loader
+    london_id = world.geography.get_unit('London').id
+    page1 = loader.load_unit_people(london_id, page=1, per_page=2)
+    page2 = loader.load_unit_people(london_id, page=2, per_page=2)
     assert page1['total_pages'] == 2
     assert len(page1['people']) == 2 and len(page2['people']) == 1
     ids = {p['id'] for p in page1['people']} | {p['id'] for p in page2['people']}
@@ -169,11 +172,12 @@ def test_load_unit_people_pagination(subtree_loader):
 
 
 def test_load_unit_venues_subtree_and_filter(subtree_loader):
-    _, loader = subtree_loader
-    allv = loader.load_unit_venues('London', page=1, per_page=50, type_filter=None)
+    world, loader = subtree_loader
+    london_id = world.geography.get_unit('London').id
+    allv = loader.load_unit_venues(london_id, page=1, per_page=50, type_filter=None)
     assert allv['total_count'] == 2
     assert {v['name'] for v in allv['venues']} == {'Pub', 'School'}
-    bars = loader.load_unit_venues('London', page=1, per_page=50, type_filter='bar')
+    bars = loader.load_unit_venues(london_id, page=1, per_page=50, type_filter='bar')
     assert bars['total_count'] == 1
     pub = bars['venues'][0]
     assert pub['name'] == 'Pub' and pub['type'] == 'bar'

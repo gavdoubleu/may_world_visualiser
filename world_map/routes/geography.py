@@ -50,7 +50,7 @@ def get_geography_level(level):
                 continue
 
             lat, lon = unit.coordinates
-            stats = world._unit_statistics.get(unit_name)
+            stats = world._unit_statistics.get(unit.id)
 
             features.append(point_feature(lat, lon, {
                 'id': int(unit.id) if hasattr(unit.id, 'item') else unit.id,
@@ -85,7 +85,7 @@ def get_unit_details(unit_name):
         if not unit:
             return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
-        stats = world._unit_statistics.get(unit_name)
+        stats = world._unit_statistics.get(unit.id)
         if stats is None:
             return jsonify({'error': f'No statistics for unit {unit_name}'}), 404
 
@@ -99,7 +99,7 @@ def get_unit_details(unit_name):
 
         children_info = []
         for child in (unit.children or []):
-            child_stats = world._unit_statistics.get(child.name)
+            child_stats = world._unit_statistics.get(child.id)
             children_info.append({
                 'id': child.id,
                 'name': child.name,

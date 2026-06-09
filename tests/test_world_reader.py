@@ -128,10 +128,12 @@ def test_compute_unit_statistics_omits_activity_counts_when_disabled(unit_statis
         geography = _load_geography_from(unit_statistics_h5)
         stats = compute_unit_statistics(f, geography, include_activity_counts=False)
 
-    assert stats['London'].activity_counts == {}
-    assert stats['Camden'].activity_counts == {}
-    assert stats['London'].population == 3  # aggregated: 2 in London + 1 in Camden
-    assert stats['Camden'].population == 1
+    london_id = geography.get_unit('London').id
+    camden_id = geography.get_unit('Camden').id
+    assert stats[london_id].activity_counts == {}
+    assert stats[camden_id].activity_counts == {}
+    assert stats[london_id].population == 3  # aggregated: 2 in London + 1 in Camden
+    assert stats[camden_id].population == 1
 
 
 def test_compute_unit_statistics_aggregates_activity_counts_when_enabled(unit_statistics_h5):
@@ -139,8 +141,10 @@ def test_compute_unit_statistics_aggregates_activity_counts_when_enabled(unit_st
         geography = _load_geography_from(unit_statistics_h5)
         stats = compute_unit_statistics(f, geography, include_activity_counts=True)
 
-    assert stats['Camden'].activity_counts == {'school': 1}
-    assert stats['London'].activity_counts == {'shopping': 2, 'school': 1}
+    london_id = geography.get_unit('London').id
+    camden_id = geography.get_unit('Camden').id
+    assert stats[camden_id].activity_counts == {'school': 1}
+    assert stats[london_id].activity_counts == {'shopping': 2, 'school': 1}
 
 
 def test_compute_unit_statistics_keeps_venue_types_for_population_less_unit(venue_only_unit_h5):
@@ -151,10 +155,12 @@ def test_compute_unit_statistics_keeps_venue_types_for_population_less_unit(venu
         geography = _load_geography_from(venue_only_unit_h5)
         stats = compute_unit_statistics(f, geography, include_activity_counts=False)
 
-    assert stats['Westfield'].venue_types == {'cinema': 1, 'office': 1}
-    assert stats['Westfield'].population == 2  # aggregated up from Stratford
-    assert stats['England'].venue_types == {'cinema': 1, 'office': 1}
-    assert stats['England'].population == 2
+    england_id   = geography.get_unit('England').id
+    westfield_id = geography.get_unit('Westfield').id
+    assert stats[westfield_id].venue_types == {'cinema': 1, 'office': 1}
+    assert stats[westfield_id].population == 2  # aggregated up from Stratford
+    assert stats[england_id].venue_types == {'cinema': 1, 'office': 1}
+    assert stats[england_id].population == 2
 
 
 def test_root_unit_venue_types_matches_world_level_counts(venue_only_unit_h5):
@@ -169,7 +175,8 @@ def test_root_unit_venue_types_matches_world_level_counts(venue_only_unit_h5):
         venue_types_arr  = f['venues']['types'][:]
         venue_type_names = f['metadata']['registries']['venue_types'][:].astype(str)
 
-    assert stats['England'].venue_types == compute_venue_type_counts(venue_types_arr, venue_type_names)
+    england_id = geography.get_unit('England').id
+    assert stats[england_id].venue_types == compute_venue_type_counts(venue_types_arr, venue_type_names)
 
 
 def test_compute_unit_statistics_excludes_child_venues_from_type_counts(parent_child_venue_unit_h5):
@@ -180,5 +187,7 @@ def test_compute_unit_statistics_excludes_child_venues_from_type_counts(parent_c
         geography = _load_geography_from(parent_child_venue_unit_h5)
         stats = compute_unit_statistics(f, geography, include_activity_counts=False)
 
-    assert stats['Westfield'].venue_types == {'company': 1}
-    assert stats['England'].venue_types == {'company': 1}
+    england_id   = geography.get_unit('England').id
+    westfield_id = geography.get_unit('Westfield').id
+    assert stats[westfield_id].venue_types == {'company': 1}
+    assert stats[england_id].venue_types == {'company': 1}

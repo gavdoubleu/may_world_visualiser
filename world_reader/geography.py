@@ -96,6 +96,9 @@ class GeographyManager:
     def get_unit(self, name):
         return self._units_by_name.get(name)
 
+    def get_unit_by_id(self, unit_id: int):
+        return self.units_by_id.get(unit_id)
+
     def get_units_by_level(self, level):
         return self._units_by_level.get(level, {})
 

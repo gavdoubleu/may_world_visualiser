@@ -41,7 +41,7 @@ def get_tree():
     stats = getattr(world, '_unit_statistics', {}) or {}
     nodes = []
     for uid, unit in world.geography.units_by_id.items():
-        unit_stats = stats.get(unit.name)
+        unit_stats = stats.get(unit.id)
         nodes.append({
             'id':           int(uid),
             'name':         unit.name,
@@ -53,20 +53,20 @@ def get_tree():
     return jsonify(nodes)
 
 
-@explorer_bp.route('/api/explorer/unit/<unit_name>')
-def get_unit_detail(unit_name):
+@explorer_bp.route('/api/explorer/unit/<int:unit_id>')
+def get_unit_detail(unit_id):
     """Unit detail built from the explorer's geography + aggregate statistics."""
     world = get_explorer_context().world
     if not world.geography:
         return jsonify({'error': 'No geography data'}), 404
 
-    unit = world.geography.get_unit(unit_name)
+    unit = world.geography.get_unit_by_id(unit_id)
     if not unit:
-        return jsonify({'error': f'Unit {unit_name} not found'}), 404
+        return jsonify({'error': f'Unit {unit_id} not found'}), 404
 
-    stats = world._unit_statistics.get(unit_name)
+    stats = world._unit_statistics.get(unit_id)
     if stats is None:
-        return jsonify({'error': f'No statistics for unit {unit_name}'}), 404
+        return jsonify({'error': f'No statistics for unit {unit_id}'}), 404
 
     parent_info = None
     if unit.parent:
@@ -75,7 +75,7 @@ def get_unit_detail(unit_name):
 
     children_info = []
     for child in (unit.children or []):
-        child_stats = world._unit_statistics.get(child.name)
+        child_stats = world._unit_statistics.get(child.id)
         children_info.append({
             'id': child.id, 'name': child.name, 'level': child.level,
             'population': child_stats.population if child_stats else 0,
@@ -96,32 +96,32 @@ def get_unit_detail(unit_name):
     }))
 
 
-@explorer_bp.route('/api/explorer/unit/<unit_name>/people')
-def get_unit_people(unit_name):
+@explorer_bp.route('/api/explorer/unit/<int:unit_id>/people')
+def get_unit_people(unit_id):
     ctx = get_explorer_context()
     if not ctx.world.geography:
         return jsonify({'error': 'No geography data'}), 404
-    if not ctx.world.geography.get_unit(unit_name):
-        return jsonify({'error': f'Unit {unit_name} not found'}), 404
+    if not ctx.world.geography.get_unit_by_id(unit_id):
+        return jsonify({'error': f'Unit {unit_id} not found'}), 404
 
     page     = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 200)
-    return jsonify(ctx.record_reader.load_unit_people(unit_name, page, per_page))
+    return jsonify(ctx.record_reader.load_unit_people(unit_id, page, per_page))
 
 
-@explorer_bp.route('/api/explorer/unit/<unit_name>/venues')
-def get_unit_venues(unit_name):
+@explorer_bp.route('/api/explorer/unit/<int:unit_id>/venues')
+def get_unit_venues(unit_id):
     ctx = get_explorer_context()
     if not ctx.world.geography:
         return jsonify({'error': 'No geography data'}), 404
-    if not ctx.world.geography.get_unit(unit_name):
-        return jsonify({'error': f'Unit {unit_name} not found'}), 404
+    if not ctx.world.geography.get_unit_by_id(unit_id):
+        return jsonify({'error': f'Unit {unit_id} not found'}), 404
 
     venue_type_filter = request.args.get('type')
     page     = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 200)
     return jsonify(ctx.record_reader.load_unit_venues(
-        unit_name, page, per_page, venue_type_filter))
+        unit_id, page, per_page, venue_type_filter))
 
 
 @explorer_bp.route('/static/images/<path:filename>')
@@ -158,7 +158,7 @@ def get_venue_detail(venue_id):
 def locate_venue(venue_id):
     per_page = min(request.args.get('per_page', 20, type=int), 200)
     result   = get_explorer_context().record_reader.locate_venue(venue_id, per_page)
-    if result is None or result['geo_unit'] is None:
+    if result is None or result['geo_unit_id'] is None:
         return jsonify({'error': f'Venue {venue_id} not found'}), 404
     return jsonify(result)
 
@@ -167,7 +167,7 @@ def locate_venue(venue_id):
 def locate_person(person_id):
     per_page = min(request.args.get('per_page', 20, type=int), 200)
     result   = get_explorer_context().record_reader.locate_person(person_id, per_page)
-    if result is None or result['geo_unit'] is None:
+    if result is None or result['geo_unit_id'] is None:
         return jsonify({'error': f'Person {person_id} not found'}), 404
     return jsonify(result)
 

@@ -245,11 +245,11 @@ class RecordReader:
             'properties': properties, 'geographical_unit': geo_info,
         }
 
-    def load_unit_people(self, unit_name: str, page: int, per_page: int) -> dict:
+    def load_unit_people(self, unit_id: int, page: int, per_page: int) -> dict:
         """Paginated id/age/sex for the unit's whole subtree, via SubtreeIndex."""
-        unit = self._geography.get_unit(unit_name)
+        unit = self._geography.get_unit_by_id(unit_id)
         if unit is None or self._subtree_index is None:
-            return {'unit_name': unit_name, 'total_count': 0, 'page': page,
+            return {'unit_id': unit_id, 'total_count': 0, 'page': page,
                     'per_page': per_page, 'total_pages': 0, 'people': []}
 
         rows  = np.sort(self._subtree_index.person_rows(unit.id))
@@ -271,17 +271,17 @@ class RecordReader:
                 })
 
         return {
-            'unit_name': unit_name, 'total_count': total, 'page': page,
+            'unit_id': unit_id, 'total_count': total, 'page': page,
             'per_page': per_page, 'total_pages': calc_total_pages(total, per_page),
             'people': people,
         }
 
-    def load_unit_venues(self, unit_name: str, page: int, per_page: int,
+    def load_unit_venues(self, unit_id: int, page: int, per_page: int,
                          type_filter: str | None) -> dict:
         """Paginated venues for the unit's subtree, via SubtreeIndex."""
-        unit = self._geography.get_unit(unit_name)
+        unit = self._geography.get_unit_by_id(unit_id)
         if unit is None or self._subtree_index is None:
-            return {'unit_name': unit_name, 'venue_type': type_filter, 'total_count': 0,
+            return {'unit_id': unit_id, 'venue_type': type_filter, 'total_count': 0,
                     'page': page, 'per_page': per_page, 'total_pages': 0, 'venues': []}
 
         rows = np.sort(self._subtree_index.venue_rows(unit.id))
@@ -334,7 +334,7 @@ class RecordReader:
                     })
 
         return {
-            'unit_name': unit_name, 'venue_type': type_filter, 'total_count': total,
+            'unit_id': unit_id, 'venue_type': type_filter, 'total_count': total,
             'page': page, 'per_page': per_page,
             'total_pages': calc_total_pages(total, per_page), 'venues': venues,
         }
@@ -493,14 +493,14 @@ class RecordReader:
                       if type_code < len(self._venue_type_names_cache) else 'unknown')
         position   = int(self._venue_list_position[result_row])
         return {
-            'geo_unit':   unit.name if unit else None,
-            'venue_type': venue_type,
-            'page':       position // per_page + 1,
+            'geo_unit_id': unit.id if unit else None,
+            'venue_type':  venue_type,
+            'page':        position // per_page + 1,
             **parent_extra,
         }
 
     def locate_person(self, person_id: int, per_page: int) -> dict | None:
-        """Return {geo_unit, page} for person_id, or None if invalid."""
+        """Return {geo_unit_id, page} for person_id, or None if invalid."""
         if self._person_id_to_idx is None:
             return None
         array_idx = int(self._person_id_to_idx[person_id])
@@ -511,8 +511,8 @@ class RecordReader:
         unit      = self._geography.units_by_id.get(geo_id)
         position  = int(self._person_list_position[array_idx])
         return {
-            'geo_unit': unit.name if unit else None,
-            'page':     position // per_page + 1,
+            'geo_unit_id': unit.id if unit else None,
+            'page':        position // per_page + 1,
         }
 
     # ── small helpers ────────────────────────────────────────────────────────────

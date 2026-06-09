@@ -75,9 +75,9 @@ def load_events_with_world(events_path: str, world=None) -> EventAggregator:
         coords = world.geography.geo_unit_coords()
         unit_statistics = getattr(world, '_unit_statistics', None) or {}
         population = {
-            unit.id: unit_statistics[unit.name].population
+            unit.id: unit_statistics[unit.id].population
             for unit in world.geography.units_by_id.values()
-            if unit.name in unit_statistics
+            if unit.id in unit_statistics
         }
 
     aggregator = load_event_aggregator(events_path, coords, population)
