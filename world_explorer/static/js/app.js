@@ -45,6 +45,41 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('panel-fwd-btn')
     .addEventListener('click', navigatePanelForward);
   loadTree();
+
+  // Geo unit search (tree pane) — handlers defined in navigation.js
+  const treeInput    = document.getElementById('tree-search-input');
+  const treeBtn      = document.getElementById('tree-search-btn');
+  const treeError    = document.getElementById('tree-search-error');
+  const treeDropdown = document.getElementById('tree-search-dropdown');
+  treeInput.addEventListener('input', () => treeError.setAttribute('hidden', ''));
+  treeBtn.addEventListener('click',   () => performGeoUnitSearch(treeInput.value, treeError, treeDropdown));
+  treeInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') performGeoUnitSearch(treeInput.value, treeError, treeDropdown);
+  });
+
+  // ID search (below main window)
+  const idInput   = document.getElementById('id-search-input');
+  const personBtn = document.getElementById('id-search-person-btn');
+  const venueBtn  = document.getElementById('id-search-venue-btn');
+  const idError   = document.getElementById('id-search-error');
+
+  async function doPersonSearch() {
+    const id = parseInt(idInput.value, 10);
+    if (isNaN(id)) { showSearchError(idError, 'Enter a numeric ID'); return; }
+    const result = await goToPerson(id);
+    if (!result) showSearchError(idError, 'Person not found');
+  }
+  async function doVenueSearch() {
+    const id = parseInt(idInput.value, 10);
+    if (isNaN(id)) { showSearchError(idError, 'Enter a numeric ID'); return; }
+    const result = await goToVenue(id);
+    if (!result) showSearchError(idError, 'Venue not found');
+  }
+
+  idInput.addEventListener('input',   () => idError.setAttribute('hidden', ''));
+  personBtn.addEventListener('click', doPersonSearch);
+  venueBtn.addEventListener('click',  doVenueSearch);
+  idInput.addEventListener('keydown', e => { if (e.key === 'Enter') doPersonSearch(); });
 });
 
 // ── helpers ───────────────────────────────────────────────────────────────────

@@ -102,6 +102,19 @@ class GeographyManager:
     def get_units_by_level(self, level):
         return self._units_by_level.get(level, {})
 
+    def search_units_by_name(self, query: str) -> list[dict]:
+        lower = query.strip().lower()
+        results = []
+        for unit in self.units_by_id.values():
+            if unit.name.lower() == lower:
+                results.append({
+                    'id':          unit.id,
+                    'name':        unit.name,
+                    'level':       unit.level,
+                    'parent_name': unit.parent.name if unit.parent else None,
+                })
+        return results
+
     def geo_unit_coords(self) -> dict[int, tuple[float, float]]:
         """{unit_id: (lat, lon)} for every unit carrying coordinates.
 

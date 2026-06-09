@@ -53,6 +53,15 @@ def get_tree():
     return jsonify(nodes)
 
 
+@explorer_bp.route('/api/explorer/geo_unit/search')
+def search_geo_units():
+    query = request.args.get('name', '').strip()
+    if not query:
+        return jsonify({'error': 'name parameter required'}), 400
+    results = get_explorer_context().world.geography.search_units_by_name(query)
+    return jsonify(results)
+
+
 @explorer_bp.route('/api/explorer/unit/<int:unit_id>')
 def get_unit_detail(unit_id):
     """Unit detail built from the explorer's geography + aggregate statistics."""

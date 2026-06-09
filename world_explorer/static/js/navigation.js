@@ -1,7 +1,45 @@
 'use strict';
 
-// Cross-navigation helpers — depend on state, fetchJson, loadUnit, PAGE_SIZE
+// Cross-navigation helpers — depend on state, fetchJson, loadUnit, PAGE_SIZE, esc
 // from app.js (loaded first).
+
+function showSearchError(errorEl, message) {
+  errorEl.textContent = message;
+  errorEl.removeAttribute('hidden');
+  clearTimeout(errorEl._dismissTimer);
+  errorEl._dismissTimer = setTimeout(() => errorEl.setAttribute('hidden', ''), 3000);
+}
+
+async function performGeoUnitSearch(query, errorEl, dropdownEl) {
+  dropdownEl.setAttribute('hidden', '');
+  dropdownEl.innerHTML = '';
+  if (!query.trim()) return;
+  let results;
+  try {
+    results = await fetchJson(`/api/explorer/geo_unit/search?name=${encodeURIComponent(query)}`);
+  } catch {
+    showSearchError(errorEl, 'Search failed');
+    return;
+  }
+  if (results.length === 0) {
+    showSearchError(errorEl, 'Not found');
+    return;
+  }
+  if (results.length === 1) {
+    goToGeoUnit(results[0].id);
+    return;
+  }
+  dropdownEl.innerHTML = results.map(r =>
+    `<li data-unit-id="${r.id}">${esc(r.name)} · ${esc(r.level)}${r.parent_name ? ' · ' + esc(r.parent_name) : ''}</li>`
+  ).join('');
+  dropdownEl.removeAttribute('hidden');
+  dropdownEl.addEventListener('click', e => {
+    const li = e.target.closest('li[data-unit-id]');
+    if (!li) return;
+    dropdownEl.setAttribute('hidden', '');
+    goToGeoUnit(Number(li.dataset.unitId));
+  }, { once: true });
+}
 
 async function goToPerson(personId) {
   let location;
