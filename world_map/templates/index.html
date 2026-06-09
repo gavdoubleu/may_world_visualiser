@@ -35,7 +35,7 @@
 
         <!-- Info Panel -->
         <div id="info-panel" class="hidden">
-            <button id="close-panel" class="close-btn" onclick="document.getElementById('info-panel').classList.add('hidden'); if(window.state&&state.map)state.map.closePopup();">&times;</button>
+            <button id="close-panel" class="close-btn">&times;</button>
             <div id="info-content"></div>
         </div>
     </div>
@@ -79,6 +79,10 @@
         }
     })();
     </script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/panel_builders.js"></script>
+    <script src="/static/js/geography.js"></script>
+    <script src="/static/js/people.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/events.js"></script>
 </body>

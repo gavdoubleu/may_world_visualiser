@@ -1,0 +1,31 @@
+{
+  "name": "may_world_visualiser",
+  "version": "1.0.0",
+  "description": "Interactive Leaflet.js map for visualising geographic world-state data stored in HDF5 files. Supports a live Flask server or self-contained static HTML export.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/js/**/*.test.js"]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gavdoubleu/may_world_visualiser.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gavdoubleu/may_world_visualiser/issues"
+  },
+  "homepage": "https://github.com/gavdoubleu/may_world_visualiser#readme",
+  "devDependencies": {
+    "jest": "^30.4.2"
+  }
+}

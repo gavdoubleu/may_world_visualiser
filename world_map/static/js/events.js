@@ -1048,9 +1048,12 @@ async function getEventStatsHtmlForUnit(geoUnitId) {
 // EXPORTS / INTEGRATION
 // =============================================================================
 
+// Attach to WorldMap namespace so app.js can call getEventStatsHtmlForUnit
+window.WorldMap = window.WorldMap || {};
+window.WorldMap.getEventStatsHtmlForUnit = getEventStatsHtmlForUnit;
+
 // Call initialization after main app loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Wait for main app to initialize first
     setTimeout(() => {
         initializeEventVisualization();
     }, 1000);
