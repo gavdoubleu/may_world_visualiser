@@ -7,7 +7,7 @@ import pytest
 from world_map.events.event_bundle import EventDataBundle
 from world_map.events.event_aggregator import EventAggregator
 from world_map.events.event_loader import load_events_with_world
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 
 
 # ---------------------------------------------------------------------------

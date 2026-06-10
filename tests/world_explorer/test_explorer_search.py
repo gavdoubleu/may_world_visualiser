@@ -2,7 +2,7 @@
 and the /api/explorer/geo_unit/search endpoint."""
 
 import pytest
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 from world_explorer.app import create_app
 
 

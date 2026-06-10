@@ -1,7 +1,7 @@
 """Domain model tests for UnitStats — no Flask, no HDF5."""
 
 from world_reader.geography import UnitStats, AGE_LABELS
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 
 
 def test_unit_stats_construction():

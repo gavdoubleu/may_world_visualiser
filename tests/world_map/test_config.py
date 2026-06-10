@@ -19,7 +19,7 @@ def test_load_returns_app_config():
 
 def test_panel_config_route(client_for):
     from dataclasses import replace
-    from world_map.testing import WorldBuilder
+    from tests.support.world_builder import WorldBuilder
     cfg = replace(AppConfig.minimal(), panel={'geo_unit_panel': {'title_field': 'name'}})
     ctx = WorldBuilder().build_context(app_config=cfg)
     client = client_for(ctx)

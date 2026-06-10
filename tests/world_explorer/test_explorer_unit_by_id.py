@@ -1,7 +1,7 @@
 """Tests for ID-based explorer unit endpoints."""
 
 import pytest
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 from world_explorer.app import create_app
 
 
@@ -93,7 +93,7 @@ def test_unit_venues_by_id_returns_404_for_unknown():
 # ── /api/explorer/geography module ───────────────────────────────────────────
 
 def test_get_unit_by_id_returns_unit():
-    from world_map.testing import WorldBuilder as WB
+    from tests.support.world_builder import WorldBuilder as WB
     world = WB().add_unit('Norfolk', population=2).build_world()
     unit_id = world.geography.get_unit('Norfolk').id
     unit = world.geography.get_unit_by_id(unit_id)

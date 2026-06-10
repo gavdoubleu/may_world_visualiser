@@ -1,6 +1,6 @@
 """Geography route tests."""
 
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 
 
 def test_geography_levels_empty(client_for):

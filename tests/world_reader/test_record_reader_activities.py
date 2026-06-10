@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import h5py
 
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 from world_reader import RecordReader
 
 

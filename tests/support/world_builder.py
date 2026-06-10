@@ -3,8 +3,8 @@ world_reader lazy backend (WorldStore/RecordReader).
 
 Writes a small synthetic world_state.h5 and loads it through the real
 build_world_store/RecordReader path, mirroring the fixture-building patterns
-in tests/test_record_reader_activities.py (subtree_world_h5) and
-tests/test_bulk_venues.py (bulk_venues_h5) — exercises the same backend as
+in tests/world_reader/test_record_reader_activities.py (subtree_world_h5) and
+tests/world_reader/test_bulk_venues.py (bulk_venues_h5) — exercises the same backend as
 production rather than a duck-typed stand-in.
 """
 

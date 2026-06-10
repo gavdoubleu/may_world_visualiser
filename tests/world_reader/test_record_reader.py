@@ -2,7 +2,7 @@
 
 import h5py
 
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 from world_reader import RecordReader
 from world_reader.statistics import compute_geographical_distribution
 

@@ -1,6 +1,6 @@
 """Tests for the shared webapp_utilities.make_app factory skeleton."""
 
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 
 
 def _build_world():

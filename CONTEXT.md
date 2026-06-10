@@ -8,7 +8,7 @@ description: Domain glossary for the may_world_visualiser repository
 ## Core Domain Objects
 
 **GeoUnit**
-A geographical unit loaded from the HDF5 world file. GeoUnits form a strict hierarchy via `.parent` / `.children` references. Each GeoUnit has a named level (e.g. `country`, `region`, `area`). Leaf GeoUnits directly contain People and Venues; non-leaf GeoUnits aggregate statistics upward from their descendants.
+A geographical unit loaded from the HDF5 world file. GeoUnits form a strict hierarchy via `.parent` / `.children` references. Each GeoUnit has a named level (e.g. `country`, `region`, `area`). Venues may be directly assigned to **any** GeoUnit, leaf or non-leaf (e.g. commercial/leisure venues commonly sit at MGU level above the SGU/household units that hold the resident population). Population is leaf-only: only leaf GeoUnits directly contain People. Every GeoUnit aggregates statistics upward from its own direct assignments plus its descendants.
 
 **Person**
 An individual resident assigned to exactly one GeoUnit. Carries slim attributes: id, age, sex, and a list of activity type strings. Full detail (activity_map) is available via a separate API call.
@@ -42,3 +42,14 @@ Pagination follows two intentional patterns: routes/tests holding a fully materi
 
 **Detail Panel**
 The slide-in panel on the right edge of WorldExplorer. Displays full detail for a single domain object (Person or Venue). For a Person: id, age, sex, geo_unit, properties, and activity map. For a Venue: name, type, geo_unit, coordinates, properties, and member list (paginated by Subset). Panel history supports back/forward navigation.
+
+## Testing Conventions
+
+Python tests under `tests/` mirror the three packages above:
+
+- `tests/world_reader/` — the shared lazy backend (WorldStore, RecordReader, statistics, ID-index/venue-ID semantics).
+- `tests/world_map/` — WorldMap Flask routes, config, pagination, conversion utilities.
+- `tests/world_explorer/` — WorldExplorer Flask routes.
+- `tests/support/world_builder.py` — shared `WorldBuilder` fixture factory; writes a synthetic `world_state.h5` and loads it via the real `build_world_store`/`RecordReader` path so tests exercise the same backend as production.
+- `tests/conftest.py` — root-level `client_for` fixture (Flask test client from an `AppContext`), available to all subdirectories.
+- `tests/js/` — Jest tests for `world_map/static/js/` ES modules; standalone, no shared fixtures.

@@ -6,7 +6,7 @@ import pytest
 import h5py
 from flask import Flask
 
-from world_map.testing import WorldBuilder
+from tests.support.world_builder import WorldBuilder
 from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
 from world_reader import RecordReader
 from world_explorer.routes.explorer import explorer_bp
