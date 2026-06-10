@@ -1,1 +1,0 @@
-python launch_world_map.py --world-file data/world_state_medieval.h5 --map-background image --map-image data/image1.png --map-bounds "56.0,2.0,49.0,-7.0" --debug --events-file ../../Black_Death/Animations/animations/data/simulation_events_sailors.h5  2>&1 | tee log.txt

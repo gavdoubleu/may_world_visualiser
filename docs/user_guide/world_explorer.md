@@ -2,9 +2,15 @@
 
 File-explorer-style browser for inspecting a `world_state.h5` file. Launched independently of WorldMap on port 5001.
 
+```bash
+python launch_world_explorer.py --world-file data/my_world.h5
+```
+
+Open `http://127.0.0.1:5001` in a browser. Navigate the GeoUnit hierarchy as a collapsible tree; click any unit to see its population, venues, and individual records.
+
 ## Architecture
 
-WorldExplorer uses a **lazy HDF5 backend** — it never materialises Person, Venue, or Subset as in-memory Python objects. Only the geography tree, aggregate per-unit statistics, and lightweight row indices are held in memory. Individual records are read from HDF5 on demand per request. This reduces cold-start time from ~49s to ~1.7s on the medieval dataset (see ADR 0002).
+WorldExplorer uses a **lazy HDF5 backend** — it never materialises Person, Venue, or Subset as in-memory Python objects. Only the geography tree, aggregate per-unit statistics, and lightweight row indices are held in memory. Individual records are read from HDF5 on demand per request. This reduces cold-start time from ~49s to ~1.7s on the medieval dataset (see [ADR 0002](../adr/0002-unified-lazy-hdf5-backend.md)).
 
 The lazy backend (`WorldStore`/`RecordReader`/`SubtreeIndex`/`build_world_store`) lives in
 the neutral `world_reader/` package and is shared with WorldMap — neither app
@@ -21,13 +27,17 @@ launch_world_explorer.py
 
 world_reader/
 ├── world_store.py         # build_world_store() → WorldStore; SubtreeIndex
-└── record_reader.py       # RecordReader: on-demand HDF5 reads
+└── record_reader/         # RecordReader: on-demand HDF5 reads (mixin-based)
+    ├── core.py             # RecordReader class
+    ├── person_reads.py      # Person record loading methods
+    └── venue_reads.py        # Venue record loading methods
 ```
 
 ## Key Classes
 
 ### `WorldStore`
 Holds what is resident in memory:
+
 - `geography` — GeoUnit hierarchy
 - `_unit_statistics` — per-unit population / age / sex / venue-type counts, aggregated upward
 - `person_id_to_idx` — maps person ID → HDF5 array row
@@ -74,10 +84,11 @@ Pagination defaults: `page=1`, `per_page=50`, max `per_page=200`.
 ## Shared Components
 
 WorldExplorer reuses:
+
 - `world_reader.geography` — HDF5 geography tree loader (`load_geography`, `GeoUnit`, `GeographyManager`)
 - `world_reader.UnitStats` — aggregate stats dataclass
 - `world_reader.calc_total_pages` — pagination helper
-- `world_map.themes.theme_css.build_root_block` — CSS variable generation
-- `world_map.utils.convert_numpy_types` — JSON serialisation helper
+- `world_reader.convert.convert_numpy_types` — JSON serialisation helper
+- `webapp_utilities.theme_css.render_theme_css` — CSS variable generation
 
 It does **not** use WorldMap's `AppContext`, population/venues/events blueprints, or `load_world_from_hdf5`.

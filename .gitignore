@@ -13,3 +13,5 @@ log*.txt
 tmp/
 node_modules/
 graphify-out/
+site/
+.venv-docs/

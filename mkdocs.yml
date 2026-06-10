@@ -1,0 +1,59 @@
+site_name: may_world_visualiser
+site_description: Tools for visualising and exploring MAY world files
+repo_url: https://github.com/gavdoubleu/may_world_visualiser
+repo_name: gavdoubleu/may_world_visualiser
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep-purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - WorldMap & Static Export: user_guide/world_map.md
+      - WorldExplorer: user_guide/world_explorer.md
+  - Architecture: architecture.md
+  - Decision Records:
+      - "ADR 0001: Lazy HDF5 backend": adr/0001-worldexplorer-lazy-hdf5-backend.md
+      - "ADR 0002: Unified lazy backend": adr/0002-unified-lazy-hdf5-backend.md
+  - API Reference: reference/
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - scripts/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - include-markdown
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["."]
+          options:
+            docstring_style: google
+            show_source: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.superfences
+  - pymdownx.highlight
