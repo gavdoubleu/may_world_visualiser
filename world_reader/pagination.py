@@ -13,6 +13,16 @@ from dataclasses import dataclass
 
 @dataclass
 class PaginationSlice:
+    """One page of a fully materialised list, plus pagination metadata.
+
+    Attributes:
+        items: The items for this page.
+        total: Total number of items across all pages.
+        total_pages: Total number of pages.
+        page: 1-indexed page number for this slice.
+        per_page: Page size used to compute `total_pages` and the slice.
+    """
+
     items: list
     total: int
     total_pages: int
@@ -21,6 +31,16 @@ class PaginationSlice:
 
 
 def paginate(items: list, page: int, per_page: int) -> PaginationSlice:
+    """Slice a fully materialised list into one page.
+
+    Args:
+        items: The full list to paginate.
+        page: 1-indexed page number.
+        per_page: Page size.
+
+    Returns:
+        A PaginationSlice for the requested page.
+    """
     total   = len(items)
     n_pages = calc_total_pages(total, per_page)
     start   = (page - 1) * per_page
@@ -28,4 +48,5 @@ def paginate(items: list, page: int, per_page: int) -> PaginationSlice:
 
 
 def calc_total_pages(total: int, per_page: int) -> int:
+    """Number of pages needed to cover `total` items at `per_page` each (minimum 1)."""
     return max(1, (total + per_page - 1) // per_page)

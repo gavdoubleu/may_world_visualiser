@@ -1,3 +1,14 @@
+"""Shared lazy HDF5 backend for WorldMap and WorldExplorer.
+
+Re-exports the public API: numpy/HDF5 conversion helpers (`convert`), the
+GeoUnit hierarchy and stats loader (`geography`), pagination helpers
+(`pagination`), per-unit/world statistics (`statistics`), the resident
+`WorldStore` (`world_store`), and the on-demand `RecordReader`
+(`record_reader`). Neither app materialises Person/Venue/Subset objects;
+only the geography tree and aggregate stats are resident. See
+`docs/architecture.md` for the overall design.
+"""
+
 from world_reader.convert import (
     SEX_DECODE, decode_str, convert_numpy_value, convert_numpy_types,
 )

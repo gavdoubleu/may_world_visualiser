@@ -16,10 +16,17 @@ def decode_str(value) -> str:
     return value.decode() if isinstance(value, bytes) else str(value)
 
 
-def convert_numpy_value(value):
+def convert_numpy_value(value: object) -> object:
     """Convert a single numpy scalar/array (recursively) to native Python types.
 
     Used for HDF5 property values, which may be nested arrays or byte strings.
+
+    Args:
+        value: A numpy scalar, array, bytes, str, or any other value.
+
+    Returns:
+        The equivalent native Python value (`int`, `float`, `str`, `list`,
+        or `value` unchanged if no conversion applies).
     """
     if value is None:
         return None
@@ -36,11 +43,19 @@ def convert_numpy_value(value):
     return value
 
 
-def convert_numpy_types(obj) -> object:
+def convert_numpy_types(obj: object) -> object:
     """Recursively convert numpy scalars/arrays in a response structure to native
     Python types, descending into dicts/lists/tuples/sets.
 
     Used to make API responses JSON-serialisable.
+
+    Args:
+        obj: A value, dict, list, tuple, or set, possibly containing numpy
+            scalars/arrays at any depth.
+
+    Returns:
+        The equivalent structure with all numpy scalars/arrays replaced by
+        native Python `int`/`float`/`str`/`list`.
     """
     if obj is None:
         return None

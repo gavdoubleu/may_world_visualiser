@@ -7,15 +7,34 @@ explorer UI never displays activity stats).
 
 import logging
 
+import h5py
 import numpy as np
 
-from world_reader.geography import AGE_LABELS, AGE_BREAKS, UnitStats
+from world_reader.geography import AGE_LABELS, AGE_BREAKS, GeographyManager, UnitStats
 
 logger = logging.getLogger("world_reader.statistics")
 
 
-def compute_unit_statistics(f, geography, *, include_activity_counts: bool) -> dict:
-    """Pre-compute per-geographic-unit statistics from HDF5 arrays."""
+def compute_unit_statistics(
+    f: h5py.File, geography: GeographyManager, *, include_activity_counts: bool
+) -> dict[int, UnitStats]:
+    """Pre-compute per-GeoUnit statistics, aggregated up the hierarchy.
+
+    Direct (own-assignment) stats are computed per unit from the population
+    and venues arrays, then summed into each ancestor so every unit's
+    UnitStats covers its whole subtree.
+
+    Args:
+        f: Open HDF5 world file.
+        geography: GeographyManager with the GeoUnit hierarchy already loaded.
+        include_activity_counts: Compute per-unit activity-type counts (an
+            `np.unique` over the full activity map costing tens of seconds).
+            WorldExplorer skips these; the static export needs them.
+
+    Returns:
+        `{unit_id: UnitStats}` covering every unit with a direct assignment
+        or a descendant with one. Empty dict if `f` has no `population` group.
+    """
     if 'population' not in f:
         return {}
 
@@ -227,7 +246,19 @@ _SEX_LABELS = np.array(['male', 'female', 'unknown'])
 
 
 def _compute_array_stats(data, max_categories: int = 25) -> dict:
-    """Numeric or categorical summary stats for a single HDF5 dataset array."""
+    """Numeric or categorical summary stats for a single HDF5 dataset array.
+
+    Args:
+        data: Numeric or string-like HDF5 dataset (already read into memory).
+        max_categories: Max number of distinct values to report for
+            categorical data, by descending frequency.
+
+    Returns:
+        For numeric data: `{type: 'numeric', count, mean, std, min, max,
+        p25, median, p75}`. For categorical data: `{type: 'categorical',
+        count, unique_count, top_values}`. On error: `{type: 'unknown',
+        error}`.
+    """
     if data.dtype.kind in ('f', 'u', 'i'):
         arr = data.astype(np.float64).ravel()
         finite = arr[np.isfinite(arr)]
@@ -264,12 +295,21 @@ def _compute_array_stats(data, max_categories: int = 25) -> dict:
         return {'type': 'unknown', 'error': str(exc)}
 
 
-def compute_slim_statistics(f, compute_activity_stats: bool = False) -> dict:
-    """Compute aggregate statistics from an open HDF5 file.
+def compute_slim_statistics(f: h5py.File, compute_activity_stats: bool = False) -> dict:
+    """Compute world-level summary statistics from an open HDF5 file.
 
-    `compute_activity_stats` gates the world-level activity-map breakdown
-    (an `np.unique` over the full activity map costing tens of seconds) —
-    skipped on live loads, computed for the static export.
+    Args:
+        f: Open HDF5 world file.
+        compute_activity_stats: Compute the world-level activity-map
+            breakdown (an `np.unique` over the full activity map costing
+            tens of seconds) — skipped on live loads, computed for the
+            static export.
+
+    Returns:
+        A dict with keys `person_properties`, `subset_sizes` (if any
+        non-empty subsets), `activity_map` (if `compute_activity_stats`),
+        and `venue_properties`. Each `*_properties` value is keyed by
+        property name with `_compute_array_stats` output.
     """
     stats: dict = {}
 
@@ -382,11 +422,18 @@ def compute_slim_statistics(f, compute_activity_stats: bool = False) -> dict:
 
 # ─── whole-world aggregate helpers (bulk-array, no sort/np.unique over N) ──────
 
-def compute_population_statistics(f) -> dict:
+def compute_population_statistics(f: h5py.File) -> dict:
     """Population-wide total/age/sex aggregates from HDF5 arrays.
 
     Sex codes are bounded (0/1/2), so a bincount scatter replaces the
     sort-based grouping that doesn't scale to large populations.
+
+    Args:
+        f: Open HDF5 world file.
+
+    Returns:
+        `{total_people: 0}` if there is no population. Otherwise
+        `{total_people, age_stats: {mean, min, max}, sex_distribution}`.
     """
     if 'population' not in f:
         return {'total_people': 0}
@@ -421,12 +468,22 @@ def compute_population_statistics(f) -> dict:
     }
 
 
-def compute_geographical_distribution(person_geo_unit_ids, geography) -> dict:
+def compute_geographical_distribution(
+    person_geo_unit_ids: np.ndarray, geography: GeographyManager
+) -> dict:
     """Per-level counts of people by their *direct* geo unit (not descendants).
 
     Geo-unit IDs are bounded small-integer codes, so this is a single
     id→level lookup scatter plus a bincount — O(N + units), no per-unit
     Python loop over resident people lists.
+
+    Args:
+        person_geo_unit_ids: int array, one direct geo-unit id per person.
+        geography: GeographyManager with the GeoUnit hierarchy already loaded.
+
+    Returns:
+        `{level_name: count}` for levels with at least one person directly
+        assigned. Empty dict if `person_geo_unit_ids` is empty.
     """
     if person_geo_unit_ids is None or len(person_geo_unit_ids) == 0:
         return {}
@@ -447,8 +504,17 @@ def compute_geographical_distribution(person_geo_unit_ids, geography) -> dict:
     return {levels[code]: int(counts[code]) for code in range(len(levels)) if counts[code] > 0}
 
 
-def compute_venue_type_counts(venue_types_arr, venue_type_names) -> dict:
-    """Venue counts per type, derived from the resident type-code array."""
+def compute_venue_type_counts(venue_types_arr: np.ndarray, venue_type_names: list[str]) -> dict:
+    """Venue counts per type, derived from the resident type-code array.
+
+    Args:
+        venue_types_arr: int array of per-venue type codes.
+        venue_type_names: Type names indexed by code.
+
+    Returns:
+        `{venue_type_name: count}` for types with at least one venue. Empty
+        dict if `venue_types_arr` is empty.
+    """
     if venue_types_arr is None or len(venue_types_arr) == 0:
         return {}
     counts = np.bincount(venue_types_arr.astype(np.int64), minlength=len(venue_type_names))
@@ -459,11 +525,18 @@ def compute_venue_type_counts(venue_types_arr, venue_type_names) -> dict:
     }
 
 
-def venue_type_names_present(venue_types_arr, venue_type_names) -> list[str]:
+def venue_type_names_present(venue_types_arr: np.ndarray, venue_type_names: list[str]) -> list[str]:
     """Distinct venue type names present, ordered by first appearance.
 
-    Returns insertion-order-distinct names — used by `/api/world/statistics`'s
-    `venue_types` list.
+    Used by `/api/world/statistics`'s `venue_types` list.
+
+    Args:
+        venue_types_arr: int array of per-venue type codes.
+        venue_type_names: Type names indexed by code.
+
+    Returns:
+        Distinct type names in order of first appearance in
+        `venue_types_arr`. Empty list if `venue_types_arr` is empty.
     """
     if venue_types_arr is None or len(venue_types_arr) == 0:
         return []

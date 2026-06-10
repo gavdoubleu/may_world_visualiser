@@ -15,6 +15,7 @@ on the medieval dataset).
 
 import logging
 import time
+from pathlib import Path
 
 import h5py
 import numpy as np
@@ -59,9 +60,36 @@ class SubtreeIndex:
 class WorldStore:
     """Lightweight resident world store: geography + stats + indices only.
 
-    Holds `geography`, `_unit_statistics`, `_slim_statistics`,
-    `geographical_distribution`. `population` / `venues` are intentionally
-    absent — those are served lazily from HDF5.
+    `population` / `venues` are intentionally absent (always None) — those
+    are served lazily from HDF5 via `RecordReader`.
+
+    Attributes:
+        geography (GeographyManager): The GeoUnit hierarchy.
+        geographical_distribution (dict): Per-level counts of people by
+            their direct geo unit.
+        person_id_to_idx (IdIndex): Logical person ID -> population row.
+        venue_id_to_idx (IdIndex): Logical venue ID -> venues row.
+        venue_ids: Logical venue ID per venues row, or None.
+        subset_venue_ids: Sorted venues-row index per subset, for
+            binary-search lookup of a venue's subsets.
+        subtree_index (SubtreeIndex): O(1) subtree row-range lookups.
+        venue_types_arr: Per-venue type code array.
+        venue_type_names: Type names indexed by code.
+        venue_list_position: Per-venue rank within its direct unit's
+            top-level, type-filtered venue listing.
+        person_list_position: Per-person rank within their direct unit's
+            person listing.
+        venue_parent_ids: Per-venue parent venue row, or -1 for top-level.
+        venue_child_counts: Per-venue count of ChildVenues.
+        venue_child_total_members: Per-venue summed member count of its
+            ChildVenues.
+        venue_child_position: Per-ChildVenue rank within its ParentVenue's
+            children list.
+        children_by_parent_sorted: ChildVenue rows sorted by parent row.
+        children_parent_ids_sorted: Parent rows aligned with
+            `children_by_parent_sorted`, for binary search.
+        population: Always None — Person objects are not materialised.
+        venues: Always None — Venue objects are not materialised.
     """
 
     def __init__(self, geography, slim_statistics, unit_statistics,
@@ -105,8 +133,13 @@ class WorldStore:
 def _dfs_intervals(geography):
     """Assign each unit a DFS pre-order value and its subtree size.
 
-    Returns (order_by_uid, size_by_uid). A unit's subtree covers pre-order values
-    [order, order + size).
+    A unit's subtree covers pre-order values [order, order + size).
+
+    Args:
+        geography: GeographyManager with the GeoUnit hierarchy already loaded.
+
+    Returns:
+        `(order_by_uid, size_by_uid)`, both `{unit_id: int}`.
     """
     roots = [u for u in geography.units_by_id.values() if u.parent is None]
 
@@ -136,12 +169,21 @@ def _dfs_intervals(geography):
 
 
 def _build_row_ranges(geo_ids, order_by_uid, size_by_uid, max_geo_id):
-    """Sort HDF5 rows by their unit's pre-order value; return (sorted_rows, ranges).
+    """Sort HDF5 rows by their unit's pre-order value.
 
-    `sorted_rows[i]` is the HDF5 row index sitting at sorted slot i.
-    `ranges[unit_id]` is the (start, end) slice of sorted_rows covering that
-    unit's whole subtree. Rows whose geo id is not a known unit map to order -1
-    and fall outside every subtree range.
+    Rows whose geo id is not a known unit map to order -1 and fall outside
+    every subtree range.
+
+    Args:
+        geo_ids: int array, one geo-unit id per HDF5 row.
+        order_by_uid: `{unit_id: pre-order value}`, from `_dfs_intervals`.
+        size_by_uid: `{unit_id: subtree size}`, from `_dfs_intervals`.
+        max_geo_id: Largest geo-unit id, for sizing the lookup array.
+
+    Returns:
+        `(sorted_rows, ranges)` where `sorted_rows[i]` is the HDF5 row index
+        at sorted slot `i`, and `ranges[unit_id]` is the `(start, end)` slice
+        of `sorted_rows` covering that unit's whole subtree.
     """
     geoid_to_order = np.full(max_geo_id + 1, -1, dtype=np.int64)
     for uid, order in order_by_uid.items():
@@ -163,7 +205,18 @@ def _build_row_ranges(geo_ids, order_by_uid, size_by_uid, max_geo_id):
     return sorted_rows, ranges
 
 
-def _build_subtree_index(f, geography):
+def _build_subtree_index(f, geography) -> tuple[SubtreeIndex, np.ndarray, np.ndarray]:
+    """Build the SubtreeIndex plus the raw geo-unit-id arrays it was built from.
+
+    Args:
+        f: Open HDF5 world file.
+        geography: GeographyManager with the GeoUnit hierarchy already loaded.
+
+    Returns:
+        `(index, person_geo_ids, venue_geo_ids)` — the SubtreeIndex, and the
+        raw `population/geo_unit_ids` / `venues/geo_unit_ids` arrays (reused
+        by `_build_locate_indices`).
+    """
     order_by_uid, size_by_uid = _dfs_intervals(geography)
     unit_ids_max = max(order_by_uid) if order_by_uid else 0
 
@@ -192,14 +245,24 @@ def _build_locate_indices(subtree_index, geography,
                           person_geo_unit_ids, venue_parent_ids=None):
     """Build O(1) position lookup arrays for venue and person locate endpoints.
 
-    venue_list_position[venue_id]   = rank of venue within its direct geo unit's
-                                      subtree listing, filtered by type, excluding
-                                      ChildVenues (parent_id != -1).
-    person_list_position[array_idx] = rank of person within their direct geo unit's
-                                      subtree person listing.
+    Positions are 0-indexed and per_page-independent; callers divide by
+    per_page to get page numbers.
 
-    Positions are 0-indexed and per_page-independent; callers divide by per_page
-    to get page numbers.
+    Args:
+        subtree_index: SubtreeIndex from `_build_subtree_index`.
+        geography: GeographyManager with the GeoUnit hierarchy already loaded.
+        venue_geo_unit_ids: int array, one direct geo-unit id per venue.
+        venue_types_arr: int array of per-venue type codes.
+        person_geo_unit_ids: int array, one direct geo-unit id per person.
+        venue_parent_ids: int array of per-venue parent rows (-1 for
+            top-level), or None to treat every venue as top-level.
+
+    Returns:
+        `(venue_list_position, person_list_position)`. `venue_list_position
+        [row]` is the rank of that venue within its direct geo unit's
+        type-filtered, top-level-only subtree listing.
+        `person_list_position[row]` is the rank of that person within their
+        direct geo unit's subtree person listing.
     """
     num_venues  = len(venue_geo_unit_ids)
     num_persons = len(person_geo_unit_ids)
@@ -243,7 +306,7 @@ def _build_locate_indices(subtree_index, geography,
 
 # ─── public entry point ───────────────────────────────────────────────────────
 
-def build_world_store(input_file, compute_activity_stats: bool = False):
+def build_world_store(input_file: str | Path, compute_activity_stats: bool = False) -> WorldStore:
     """Build a WorldStore from world_state.h5 without materialising people/venues.
 
     Args:
@@ -252,6 +315,12 @@ def build_world_store(input_file, compute_activity_stats: bool = False):
             breakdowns (the `np.unique` over the full activity map costs tens
             of seconds). Live loads omit these (fast default); the static
             export needs them, so it loads with `True`.
+
+    Returns:
+        A populated WorldStore.
+
+    Raises:
+        OSError: If the HDF5 file has no `geography` group.
     """
     logger.info("Building world store (lazy mode) from %s", input_file)
     t_start = time.perf_counter()

@@ -25,9 +25,17 @@ class IdIndex:
     def __len__(self):
         return len(self._sorted_ids)
 
-    def __getitem__(self, logical_ids):
-        """Row index (or array of row indices) for logical_ids; MISSING (-1)
-        where the logical ID is absent."""
+    def __getitem__(self, logical_ids: int | np.ndarray) -> int | np.ndarray:
+        """Look up row index (or indices) for logical_ids.
+
+        Args:
+            logical_ids: A single logical ID or an array of them.
+
+        Returns:
+            The row index (int) for a scalar input, or an array of row
+            indices for array input. `MISSING` (-1) where a logical ID is
+            absent.
+        """
         if len(self._sorted_ids) == 0:
             missing = np.full_like(np.asarray(logical_ids), self.MISSING)
             return missing if np.ndim(logical_ids) else int(self.MISSING)

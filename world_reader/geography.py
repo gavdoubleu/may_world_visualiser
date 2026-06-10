@@ -7,6 +7,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 
+import h5py
 import numpy as np
 
 from world_reader.convert import convert_numpy_value
@@ -18,6 +19,14 @@ AGE_BREAKS: list[float] = [0, 16, 25, 35, 50, 65, math.inf]
 
 
 def age_label(age: int | float) -> str:
+    """Map an age to its AGE_LABELS bucket (e.g. 16 -> '16-24').
+
+    Args:
+        age: A person's age in years.
+
+    Returns:
+        The matching label from `AGE_LABELS`.
+    """
     for i in range(len(AGE_LABELS) - 1):
         if age < AGE_BREAKS[i + 1]:
             return AGE_LABELS[i]
@@ -26,6 +35,17 @@ def age_label(age: int | float) -> str:
 
 @dataclass
 class UnitStats:
+    """Pre-computed, hierarchy-aggregated statistics for one GeoUnit.
+
+    Attributes:
+        population: Total resident population of the unit's subtree.
+        age_distribution: Counts keyed by `AGE_LABELS` bucket.
+        sex_distribution: Counts keyed by sex label (e.g. 'male').
+        venue_types: Venue counts keyed by VenueType name.
+        activity_counts: Counts keyed by activity name (empty unless
+            activity stats were requested at load time).
+    """
+
     population: int
     age_distribution: dict[str, int]
     sex_distribution: dict[str, int]
@@ -54,6 +74,21 @@ class UnitStats:
 
 
 class GeoUnit:
+    """A node in the geographical hierarchy.
+
+    Attributes:
+        id: Logical geo-unit ID.
+        name: Display name.
+        level: Hierarchy level name (e.g. 'country', 'region', 'area').
+        coordinates: (lat, lon) tuple, or None if the unit has none.
+        parent: Parent GeoUnit, or None for a root.
+        children: Direct child GeoUnits.
+        people: Always empty — Person objects are not materialised here;
+            see `WorldStore`/`RecordReader` for lazy population access.
+        venues: Always empty — Venue objects are not materialised here.
+        properties: Arbitrary unit properties from the HDF5 geography group.
+    """
+
     def __init__(self, unit_id, name, level, coordinates=None, properties=None):
         self.id = unit_id
         self.name = name
@@ -71,7 +106,8 @@ class GeoUnit:
             all_people.extend(child.get_people())
         return all_people
 
-    def get_descendants(self):
+    def get_descendants(self) -> list['GeoUnit']:
+        """All descendant GeoUnits (children, grandchildren, ...), depth-first."""
         descendants = []
         for child in self.children:
             descendants.append(child)
@@ -80,6 +116,13 @@ class GeoUnit:
 
 
 class GeographyManager:
+    """Holds the GeoUnit hierarchy and indices for lookup by name/id/level.
+
+    Attributes:
+        levels: Distinct level names, in first-seen order.
+        units_by_id: All units, keyed by id.
+    """
+
     def __init__(self, levels=None):
         self.levels = levels or []
         self.units_by_id = {}
@@ -103,6 +146,14 @@ class GeographyManager:
         return self._units_by_level.get(level, {})
 
     def search_units_by_name(self, query: str) -> list[dict]:
+        """Find units whose name matches `query` exactly (case-insensitive).
+
+        Args:
+            query: Search string, compared case-insensitively after stripping.
+
+        Returns:
+            A list of `{id, name, level, parent_name}` dicts, one per match.
+        """
         lower = query.strip().lower()
         results = []
         for unit in self.units_by_id.values():
@@ -129,8 +180,23 @@ class GeographyManager:
         }
 
 
-def load_geography(geo_group, geo_names=None, level_registry=None):
-    """Reconstruct GeographyManager from HDF5 geography group."""
+def load_geography(
+    geo_group: h5py.Group,
+    geo_names: np.ndarray | None = None,
+    level_registry: np.ndarray | None = None,
+) -> GeographyManager:
+    """Build a GeographyManager from an HDF5 `geography` group.
+
+    Args:
+        geo_group: The open `geography` HDF5 group.
+        geo_names: Pre-decoded unit names, or None to read `geo_group['names']`.
+        level_registry: Array mapping level codes to level name strings, or
+            None if `geo_group['levels']` already stores level names directly.
+
+    Returns:
+        A GeographyManager with the full GeoUnit tree (parent/children links
+        and coordinates/properties where present) populated.
+    """
     ids = geo_group['ids'][:]
 
     names = geo_names if geo_names is not None else geo_group['names'][:].astype(str)

@@ -12,7 +12,16 @@ class _PersonReads:
     """Mixin: assumes attributes set by RecordReader.__init__ (core.py)."""
 
     def load_person_activities(self, person_id: int) -> list[dict] | None:
-        """Return ActivityMap records for person_id, or None if not found."""
+        """Load the full ActivityMap for one person.
+
+        Args:
+            person_id: Logical person ID.
+
+        Returns:
+            A list of `{activity_name, venue_id, venue_name, venue_type,
+            venue_geo_unit, subset_name}` dicts, one per activity. None if
+            `person_id` is unknown.
+        """
         if self._person_id_to_idx is None:
             return None
         person_array_idx = int(self._person_id_to_idx[person_id])
@@ -73,10 +82,20 @@ class _PersonReads:
         return activities
 
     def load_person_slim(self, person_id: int) -> dict | None:
-        """Return {id, age, sex, geographical_unit, properties} for one person.
+        """Load slim detail (no activities) for one person.
 
-        Activities are loaded separately via load_person_activities — matching the
-        slim-mode person panel, which lazily fetches activities on demand.
+        Activities are loaded separately via `load_person_activities` —
+        matching the slim-mode person panel, which lazily fetches activities
+        on demand.
+
+        Args:
+            person_id: Logical person ID.
+
+        Returns:
+            `{id, age, sex, activities: [], activity_map: {}, properties,
+            geographical_unit}`, where `geographical_unit` is
+            `{id, name, level, coordinates}` (or None if the person's geo
+            unit is unknown). None if `person_id` is unknown.
         """
         if self._person_id_to_idx is None:
             return None
@@ -109,7 +128,18 @@ class _PersonReads:
         }
 
     def load_unit_people(self, unit_id: int, page: int, per_page: int) -> dict:
-        """Paginated id/age/sex for the unit's whole subtree, via SubtreeIndex."""
+        """Paginated id/age/sex for a GeoUnit's whole subtree, via SubtreeIndex.
+
+        Args:
+            unit_id: GeoUnit ID whose subtree to list.
+            page: 1-indexed page number.
+            per_page: Page size.
+
+        Returns:
+            `{unit_id, total_count, page, per_page, total_pages, people}`,
+            where each person is `{id, age, sex, activities: [],
+            primary_activity: None}`. Empty result if `unit_id` is unknown.
+        """
         unit = self._geography.get_unit_by_id(unit_id)
         if unit is None or self._subtree_index is None:
             return {'unit_id': unit_id, 'total_count': 0, 'page': page,
@@ -140,7 +170,16 @@ class _PersonReads:
         }
 
     def locate_person(self, person_id: int, per_page: int) -> dict | None:
-        """Return {geo_unit_id, page} for person_id, or None if invalid."""
+        """Find which GeoUnit and page a person appears on in their unit's listing.
+
+        Args:
+            person_id: Logical person ID.
+            per_page: Page size of the target listing.
+
+        Returns:
+            `{geo_unit_id, page}` (1-indexed page). None if `person_id` is
+            unknown.
+        """
         if self._person_id_to_idx is None:
             return None
         array_idx = int(self._person_id_to_idx[person_id])

@@ -1,5 +1,8 @@
 """On-demand HDF5 record reads, shared by WorldMap and WorldExplorer."""
 
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 import h5py
 
 from world_reader.statistics import (
@@ -9,11 +12,26 @@ from world_reader.statistics import (
 from .person_reads import _PersonReads
 from .venue_reads import _VenueReads
 
+if TYPE_CHECKING:
+    from world_reader.world_store import WorldStore
+
 
 class RecordReader(_PersonReads, _VenueReads):
-    """All per-request HDF5 reads, wired to a resident WorldStore for indices."""
+    """All per-request HDF5 reads, wired to a resident WorldStore for indices.
 
-    def __init__(self, hdf5_path, store):
+    Holds a path to the world file (opened fresh per read) and the lookup
+    arrays/indices built once by `build_world_store`. Person/Venue/Subset
+    reads (`_PersonReads`/`_VenueReads`) use these to locate HDF5 rows
+    without materialising the full population/venue arrays.
+    """
+
+    def __init__(self, hdf5_path: str | Path, store: 'WorldStore'):
+        """Wire a RecordReader to its HDF5 file and resident WorldStore.
+
+        Args:
+            hdf5_path: Path to world_state.h5.
+            store: WorldStore built by `build_world_store` for this file.
+        """
         self._hdf5_path = str(hdf5_path)
         self._person_id_to_idx    = store.person_id_to_idx
         self._subset_venue_ids    = store.subset_venue_ids
