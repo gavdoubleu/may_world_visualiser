@@ -1,6 +1,6 @@
 # may_world_visualiser
 
-Three tools for visualising and inspecting world files (`.h5`) produced by the [MAY](https://github.com/gavdoubleu/may) agent-based modelling software:
+Three tools for visualising and inspecting world files (`.h5`) produced by the [MAY](https://github.com/IDAS-Durham/MAY) agent-based modelling software:
 
 | Tool | Purpose |
 |------|---------|
