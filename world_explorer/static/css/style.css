@@ -659,10 +659,10 @@ tr.person-expand-row td {
 .icon-btn img {
   width: 18px;
   height: 18px;
-  filter: brightness(0) invert(0.65);
+  filter: var(--header-icon-filter, brightness(0));
   display: block;
 }
-.icon-btn:hover img { filter: brightness(0) invert(1); }
+.icon-btn:hover img { filter: var(--header-icon-filter, brightness(0)); }
 
 /* ── header search ────────────────────────────────────────────────────────────── */
 

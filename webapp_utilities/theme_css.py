@@ -46,9 +46,10 @@ def build_css_vars(theme_config: dict) -> dict:
         '--theme-button-hover-text':  'var(--theme-accent)',
         '--theme-button-active-text': 'var(--theme-accent)',
         '--theme-table-row-hover':    f'rgba({accent_rgb}, 0.06)',
-        '--font-display':    f"'{display_font}'",
-        '--font-body':       f"'{body_font}'",
-        '--font-size-base':  f'{base_font_size}px',
+        '--font-display':         f"'{display_font}'",
+        '--font-body':            f"'{body_font}'",
+        '--font-size-base':       f'{base_font_size}px',
+        '--header-icon-filter':   theme_config.get('header_icon_filter', 'brightness(0)'),
     }
 
 

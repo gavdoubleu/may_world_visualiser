@@ -26,3 +26,5 @@ fonts:
   display_file: 'AtkinsonHyperlegible-Regular.woff2'
   body:         'Atkinson Hyperlegible'
   body_file:    'AtkinsonHyperlegible-Regular.woff2'
+
+header_icon_filter: 'brightness(0) invert(1)'

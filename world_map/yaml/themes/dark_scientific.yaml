@@ -22,3 +22,5 @@ fonts:
   display_file: 'ShareTechMono-Regular.woff2'
   body:         'IBM Plex Sans'
   body_file:    'IBMPlexSans-Regular.woff2'
+
+header_icon_filter: 'brightness(0) invert(1)'
