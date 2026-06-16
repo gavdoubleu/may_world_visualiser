@@ -19,9 +19,13 @@ _IMAGES_DIR       = Path(__file__).parent.parent / 'images'
 _BUILTIN_THEMES_DIR = Path(__file__).parent.parent.parent / 'world_map' / 'yaml' / 'themes'
 
 
+_DEFAULT_EXPLORER_LOGO = '/static/images/May_world_explorer_light_logo.svg'
+
+
 @explorer_bp.route('/')
 def index():
-    return render_template('index.html')
+    logo = get_explorer_context().theme.get('explorer_logo', _DEFAULT_EXPLORER_LOGO)
+    return render_template('index.html', header_logo=logo)
 
 
 @explorer_bp.route('/theme.css')
@@ -37,7 +41,8 @@ def _scan_themes():
             data = yaml.safe_load(f) or {}
         stem = path.stem
         display_name = data.get('theme_name') or stem.replace('_', ' ').title()
-        themes.append({'name': stem, 'display_name': display_name})
+        explorer_logo = data.get('explorer_logo', _DEFAULT_EXPLORER_LOGO)
+        themes.append({'name': stem, 'display_name': display_name, 'explorer_logo': explorer_logo})
     return themes
 
 

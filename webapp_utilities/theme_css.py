@@ -26,6 +26,7 @@ def build_css_vars(theme_config: dict) -> dict:
 
     display_font = fonts.get('display', 'sans-serif')
     body_font = fonts.get('body', 'sans-serif')
+    base_font_size = theme_config.get('base_font_size', 14)
 
     return {
         '--theme-bg':              colors.get('bg', '#ffffff'),
@@ -45,8 +46,9 @@ def build_css_vars(theme_config: dict) -> dict:
         '--theme-button-hover-text':  'var(--theme-accent)',
         '--theme-button-active-text': 'var(--theme-accent)',
         '--theme-table-row-hover':    f'rgba({accent_rgb}, 0.06)',
-        '--font-display': f"'{display_font}'",
-        '--font-body':    f"'{body_font}'",
+        '--font-display':    f"'{display_font}'",
+        '--font-body':       f"'{body_font}'",
+        '--font-size-base':  f'{base_font_size}px',
     }
 
 

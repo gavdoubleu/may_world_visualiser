@@ -13,11 +13,19 @@ async function applyTheme(themeName) {
     styleEl.textContent = css;
 }
 
-async function switchTheme(themeName, dropdownItems) {
+function updateLogo(themeList, themeName) {
+    const theme = themeList.find(t => t.name === themeName);
+    if (!theme) return;
+    const logoImg = document.querySelector('.header-logo');
+    if (logoImg) logoImg.src = theme.explorer_logo;
+}
+
+async function switchTheme(themeName, dropdownItems, themeList) {
     const response = await fetch(`/api/explorer/theme/${themeName}`, { method: 'POST' });
     if (!response.ok) return;
     localStorage.setItem(STORAGE_KEY, themeName);
     await applyTheme(themeName);
+    updateLogo(themeList, themeName);
     dropdownItems.forEach(li => {
         li.setAttribute('aria-current', li.dataset.name === themeName ? 'true' : 'false');
     });
@@ -47,7 +55,7 @@ export async function initThemeSwitcher() {
 
     dropdownItems.forEach(li => {
         li.addEventListener('click', () => {
-            switchTheme(li.dataset.name, dropdownItems);
+            switchTheme(li.dataset.name, dropdownItems, themes);
             dropdown.hidden = true;
         });
     });
@@ -60,6 +68,6 @@ export async function initThemeSwitcher() {
     document.addEventListener('click', () => { dropdown.hidden = true; });
 
     if (savedTheme && savedTheme !== active) {
-        await switchTheme(savedTheme, dropdownItems);
+        await switchTheme(savedTheme, dropdownItems, themes);
     }
 }

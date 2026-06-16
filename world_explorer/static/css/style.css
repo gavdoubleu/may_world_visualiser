@@ -19,6 +19,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 html, body { height: 100%; overflow: hidden; }
+html { font-size: var(--font-size-base, 14px); }
 
 /* ── root layout ────────────────────────────────────────────────────────────── */
 
@@ -29,7 +30,7 @@ html, body { height: 100%; overflow: hidden; }
   background: var(--theme-bg);
   color: var(--theme-text);
   font-family: var(--font-body, 'IBM Plex Sans'), sans-serif;
-  font-size: 14px;
+  font-size: 1rem;
 }
 
 /* ── header ─────────────────────────────────────────────────────────────────── */

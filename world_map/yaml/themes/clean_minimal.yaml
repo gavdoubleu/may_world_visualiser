@@ -6,16 +6,22 @@ logo_path: null
 colors:
   bg:             '#faf9f6'
   surface:        '#f5f3ee'
-  surface_raised: '#ffffff'
+  surface_raised: '#ebe8e0'
   border:         '#e0d8c8'
   text:           '#2c3e50'
-  text_muted:     '#7f8c8d'
+  text_muted:     '#516061'
   accent:         '#1c2b3a'
-  header_bg:      '#1c2b3a'
-  header_text:    '#ffffff'
+  header_bg:      '#f9c901'
+  header_text:    '#1c2b3a'
+  header_gradient: 'linear-gradient(135deg, #f9c901 0%, #f0bc00 100%)'
+  header_border:   'rgba(28, 43, 58, 0.15)'
+  header_shadow:   '0 1px 8px rgba(249, 201, 1, 0.30)'
 
 fonts:
   display:      'Playfair Display'
   display_file: 'PlayfairDisplay-SemiBold.woff2'
   body:         'Source Sans 3'
   body_file:    'SourceSans3-Regular.woff2'
+
+base_font_size: 16
+explorer_logo: '/static/images/May_world_explorer_dark_logo.svg'
