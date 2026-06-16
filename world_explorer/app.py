@@ -28,8 +28,10 @@ def create_app(world, hdf5_path, theme=None):
     from world_explorer.routes.explorer import explorer_bp
 
     record_reader = RecordReader(hdf5_path, world)
-    theme_dict = resolve_theme(theme or _DEFAULT_THEME, _BUILTIN_THEMES_DIR)
-    context = ExplorerContext(world=world, record_reader=record_reader, theme=theme_dict)
+    active_theme_name = theme or _DEFAULT_THEME
+    theme_dict = resolve_theme(active_theme_name, _BUILTIN_THEMES_DIR)
+    context = ExplorerContext(world=world, record_reader=record_reader, theme=theme_dict,
+                              active_theme_name=active_theme_name)
 
     app = make_app(
         __name__,

@@ -3,18 +3,20 @@
 import logging
 from pathlib import Path
 
+import yaml
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
 from world_explorer.context import get_explorer_context
-from webapp_utilities.theme_css import render_theme_css
+from webapp_utilities.theme_css import render_theme_css, resolve_theme
 from world_reader.convert import convert_numpy_types
 
 logger = logging.getLogger(__name__)
 
 explorer_bp = Blueprint('explorer', __name__)
 
-_FONTS_DIR  = Path(__file__).parent.parent.parent / 'world_map' / 'static' / 'fonts'
-_IMAGES_DIR = Path(__file__).parent.parent / 'images'
+_FONTS_DIR        = Path(__file__).parent.parent.parent / 'world_map' / 'static' / 'fonts'
+_IMAGES_DIR       = Path(__file__).parent.parent / 'images'
+_BUILTIN_THEMES_DIR = Path(__file__).parent.parent.parent / 'world_map' / 'yaml' / 'themes'
 
 
 @explorer_bp.route('/')
@@ -25,6 +27,35 @@ def index():
 @explorer_bp.route('/theme.css')
 def theme_css():
     return Response(render_theme_css(get_explorer_context().theme), mimetype='text/css')
+
+
+def _scan_themes():
+    """Return list of {name, display_name} dicts for all .yaml files in the themes dir."""
+    themes = []
+    for path in sorted(_BUILTIN_THEMES_DIR.glob('*.yaml')):
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        stem = path.stem
+        display_name = data.get('theme_name') or stem.replace('_', ' ').title()
+        themes.append({'name': stem, 'display_name': display_name})
+    return themes
+
+
+@explorer_bp.route('/api/explorer/themes')
+def list_themes():
+    ctx = get_explorer_context()
+    return jsonify({'themes': _scan_themes(), 'active': ctx.active_theme_name})
+
+
+@explorer_bp.route('/api/explorer/theme/<name>', methods=['POST'])
+def set_theme(name):
+    available = {t['name'] for t in _scan_themes()}
+    if name not in available:
+        return jsonify({'error': f'Unknown theme: {name!r}'}), 404
+    ctx = get_explorer_context()
+    ctx.theme = resolve_theme(name, _BUILTIN_THEMES_DIR)
+    ctx.active_theme_name = name
+    return jsonify({'active': name})
 
 
 @explorer_bp.route('/wm-fonts/<path:filename>')

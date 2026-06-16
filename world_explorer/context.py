@@ -16,6 +16,7 @@ class ExplorerContext:
     world: Any  # WorldStore: geography + aggregate stats, lazy people/venues
     record_reader: RecordReader
     theme: dict
+    active_theme_name: str
 
 
 get_explorer_context = make_context_accessor(_EXPLORER_CTX_KEY)

@@ -4,6 +4,7 @@ import { loadUnit } from './unit.js';
 import { loadTree } from './tree.js';
 import { renderPanelEntry, closeDetailPanel } from './panel.js';
 import { showSearchError, performGeoUnitSearch, goToPerson, goToVenue } from './cross_nav.js';
+import { initThemeSwitcher } from './theme.js';
 
 function navigateMainBack() {
   if (state.mainHistoryIdx <= 0) return;
@@ -40,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('panel-back-btn').addEventListener('click', navigatePanelBack);
   document.getElementById('panel-fwd-btn').addEventListener('click', navigatePanelForward);
   loadTree();
+  initThemeSwitcher();
 
   const searchInput     = document.getElementById('header-search-input');
   const searchGeoBtn    = document.getElementById('header-search-geo-btn');

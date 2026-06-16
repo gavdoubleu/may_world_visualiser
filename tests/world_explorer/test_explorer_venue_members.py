@@ -60,6 +60,7 @@ def explorer_client(venue_members_h5):
         world=world,
         record_reader=loader,
         theme={},
+        active_theme_name='dark_scientific',
     )
     app.register_blueprint(explorer_bp)
     return app.test_client()
