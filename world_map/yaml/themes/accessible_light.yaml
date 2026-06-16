@@ -1,0 +1,28 @@
+title: "1348 England"
+theme_name: "Accessible Light"
+subtitle: null
+logo_path: null
+
+# High-contrast light theme. WCAG AAA on body text.
+# Colourblind-safe: teal accent avoids red/green pair (safe for deuteranopia & protanopia).
+# Font: Atkinson Hyperlegible — designed for low-vision and dyslexic readers.
+
+colors:
+  bg:             '#f5f5f0'
+  surface:        '#eeeee8'
+  surface_raised: '#ffffff'
+  border:         '#c8c8bc'
+  text:           '#1a1a1a'
+  text_muted:     '#555550'
+  accent:         '#007a87'
+  header_bg:      '#1a2a35'
+  header_text:    '#f5f5f0'
+  header_gradient: 'linear-gradient(135deg, #1a2a35 0%, #243545 100%)'
+  header_border:   'rgba(0, 122, 135, 0.40)'
+  header_shadow:   '0 1px 16px rgba(0, 122, 135, 0.12)'
+
+fonts:
+  display:      'Atkinson Hyperlegible'
+  display_file: 'AtkinsonHyperlegible-Regular.woff2'
+  body:         'Atkinson Hyperlegible'
+  body_file:    'AtkinsonHyperlegible-Regular.woff2'

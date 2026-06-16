@@ -1,0 +1,28 @@
+title: "1348 England"
+theme_name: "Accessible Dark"
+subtitle: null
+logo_path: "images/June_logo_white.png"
+
+# High-contrast dark theme. WCAG AAA on body text.
+# Colourblind-safe: amber accent avoids red/green pair (safe for deuteranopia & protanopia).
+# Font: Atkinson Hyperlegible — designed for low-vision and dyslexic readers.
+
+colors:
+  bg:             '#0d1b2a'
+  surface:        '#132035'
+  surface_raised: '#1e3050'
+  border:         '#2a4060'
+  text:           '#f0f0f0'
+  text_muted:     '#a8bbd0'
+  accent:         '#ffb300'
+  header_bg:      '#091522'
+  header_text:    '#f0f0f0'
+  header_gradient: 'linear-gradient(135deg, #091522 0%, #0d1b2a 100%)'
+  header_border:   'rgba(255, 179, 0, 0.35)'
+  header_shadow:   '0 1px 20px rgba(255, 179, 0, 0.10)'
+
+fonts:
+  display:      'Atkinson Hyperlegible'
+  display_file: 'AtkinsonHyperlegible-Regular.woff2'
+  body:         'Atkinson Hyperlegible'
+  body_file:    'AtkinsonHyperlegible-Regular.woff2'
