@@ -1,0 +1,2 @@
+python launch_world_map.py --world-file data/world_state_medieval.h5 --config world_map_configs/medieval.yaml --map-background image --map-image data/terrain_noshade_log_UTM.png --map-bounds "56.13493,1.99441,49.74491,-7.05355" --map-attribution "Elevation map" --events-file ../../Black_Death/Animations/animations/data/simulation_events_sailors.h5 #--events-max-size-mb 500 --output outputs/medieval_map_3.html 2>&1 | tee log.txt --max-size-mb 300 --title "1348 England"
+#  --map-bounds "55.05603,1.99298,49.73103,-6.38048"
