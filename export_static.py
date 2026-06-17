@@ -512,6 +512,10 @@ def _build_html(
     data: dict,
     css_style: str,
     css_events: str,
+    js_utils: str,
+    js_panel_builders: str,
+    js_geography: str,
+    js_people: str,
     js_app: str,
     js_events: str,
     leaflet_js: str | None,
@@ -626,7 +630,21 @@ window.STATIC_WORLD_DATA = {data_json};
     {proj4_js_block}
     {proj4leaflet_js_block}
 
-    <!-- Application JavaScript -->
+    <!-- Application JavaScript (order matters: app.js calls into WorldMap.*
+         functions defined by the modules below it, so they must load first
+         — mirrors world_map/templates/index.html's script order) -->
+    <script>
+{js_utils}
+    </script>
+    <script>
+{js_panel_builders}
+    </script>
+    <script>
+{js_geography}
+    </script>
+    <script>
+{js_people}
+    </script>
     <script>
 {js_app}
     </script>
@@ -855,9 +873,13 @@ def main() -> None:
     static_dir = WORLD_MAP_DIR / 'static'
     css_style  = (static_dir / 'css' / 'style.css').read_text(encoding='utf-8')
     css_events = (static_dir / 'css' / 'events.css').read_text(encoding='utf-8')
-    js_app     = (static_dir / 'js' / 'app.js').read_text(encoding='utf-8')
-    js_events  = (static_dir / 'js' / 'events.js').read_text(encoding='utf-8')
-    print('  style.css, events.css, app.js, events.js — OK')
+    js_utils          = (static_dir / 'js' / 'utils.js').read_text(encoding='utf-8')
+    js_panel_builders = (static_dir / 'js' / 'panel_builders.js').read_text(encoding='utf-8')
+    js_geography      = (static_dir / 'js' / 'geography.js').read_text(encoding='utf-8')
+    js_people         = (static_dir / 'js' / 'people.js').read_text(encoding='utf-8')
+    js_app            = (static_dir / 'js' / 'app.js').read_text(encoding='utf-8')
+    js_events         = (static_dir / 'js' / 'events.js').read_text(encoding='utf-8')
+    print('  style.css, events.css, utils.js, panel_builders.js, geography.js, people.js, app.js, events.js — OK')
     from world_map.context import get_app_context
     with flask_app.app_context():
         theme = get_app_context().app_config.theme
@@ -884,6 +906,10 @@ def main() -> None:
         data=data,
         css_style=css_style,
         css_events=css_events,
+        js_utils=js_utils,
+        js_panel_builders=js_panel_builders,
+        js_geography=js_geography,
+        js_people=js_people,
         js_app=js_app,
         js_events=js_events,
         leaflet_js=leaflet_js,
