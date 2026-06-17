@@ -47,7 +47,12 @@ async function renderVenueDetails() {
                 ${venue.geo_unit ? `
                 <div class="info-item">
                     <div class="info-item-label">Geo Unit</div>
-                    <div class="info-item-value">${venue.geo_unit}</div>
+                    <div class="info-item-value">
+                        ${venue.geo_unit}
+                        <button class="icon-btn" title="Go to geo unit" onclick="WorldMap.goToGeoUnitFromVenue(${venueDetailState.venueId})">
+                            <img src="/static/images/to_geo_unit_icon.svg" alt="Go to geo unit">
+                        </button>
+                    </div>
                 </div>` : ''}
                 ${venue.coordinates ? `
                 <div class="info-item">

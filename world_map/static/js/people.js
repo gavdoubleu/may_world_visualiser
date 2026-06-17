@@ -3,7 +3,7 @@
 const peopleState = {
     currentUnit: null,
     currentPage: 1,
-    perPage: 50,
+    perPage: 20,
     totalCount: 0,
     totalPages: 0
 };
@@ -135,7 +135,12 @@ async function showPersonDetails(personId, opts = {}) {
                 <div class="info-grid">
                     <div class="info-item">
                         <div class="info-item-label">Area</div>
-                        <div class="info-item-value">${person.geographical_unit.name}</div>
+                        <div class="info-item-value">
+                            ${person.geographical_unit.name}
+                            <button class="icon-btn" title="Go to geo unit" onclick="WorldMap.goToGeoUnitFromPerson(${person.id})">
+                                <img src="/static/images/to_geo_unit_icon.svg" alt="Go to geo unit">
+                            </button>
+                        </div>
                     </div>
                     <div class="info-item">
                         <div class="info-item-label">Level</div>
@@ -177,6 +182,9 @@ async function showPersonDetails(personId, opts = {}) {
                                 <span class="venue-type-badge">${venueType}</span>
                                 <span class="venue-name">${subset.venue_name}</span>
                                 ${subset.subset_name !== 'default' ? `<span class="subset-name">(${subset.subset_name})</span>` : ''}
+                                <button class="icon-btn" title="Go to venue" onclick="WorldMap.showVenueDetails(${subset.venue_id})">
+                                    <img src="/static/images/to_venue_logo.svg" alt="Go to venue">
+                                </button>
                             </div>
                         `;
                     }

@@ -519,6 +519,7 @@ def _build_html(
     js_venues: str,
     js_venue_detail: str,
     js_people: str,
+    js_cross_nav: str,
     js_app: str,
     js_events: str,
     leaflet_js: str | None,
@@ -656,6 +657,9 @@ window.STATIC_WORLD_DATA = {data_json};
     </script>
     <script>
 {js_people}
+    </script>
+    <script>
+{js_cross_nav}
     </script>
     <script>
 {js_app}
@@ -892,9 +896,10 @@ def main() -> None:
     js_venues         = (static_dir / 'js' / 'venues.js').read_text(encoding='utf-8')
     js_venue_detail   = (static_dir / 'js' / 'venue_detail.js').read_text(encoding='utf-8')
     js_people         = (static_dir / 'js' / 'people.js').read_text(encoding='utf-8')
+    js_cross_nav      = (static_dir / 'js' / 'cross_nav.js').read_text(encoding='utf-8')
     js_app            = (static_dir / 'js' / 'app.js').read_text(encoding='utf-8')
     js_events         = (static_dir / 'js' / 'events.js').read_text(encoding='utf-8')
-    print('  style.css, events.css, utils.js, panel_navigator.js, panel_builders.js, geography.js, venues.js, venue_detail.js, people.js, app.js, events.js — OK')
+    print('  style.css, events.css, utils.js, panel_navigator.js, panel_builders.js, geography.js, venues.js, venue_detail.js, people.js, cross_nav.js, app.js, events.js — OK')
     from world_map.context import get_app_context
     with flask_app.app_context():
         theme = get_app_context().app_config.theme
@@ -928,6 +933,7 @@ def main() -> None:
         js_venues=js_venues,
         js_venue_detail=js_venue_detail,
         js_people=js_people,
+        js_cross_nav=js_cross_nav,
         js_app=js_app,
         js_events=js_events,
         leaflet_js=leaflet_js,

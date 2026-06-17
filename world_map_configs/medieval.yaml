@@ -130,7 +130,7 @@ panel:
       - name: "venue_breakdown"
         title: "Venue Types"
         type: "breakdown"
-        enabled: true
+        enabled: false  # superseded by the "View Venues" lazy drill-down button
         source: "venue_types"
         sort_by: "count"
         sort_order: "desc"
@@ -139,7 +139,7 @@ panel:
       - name: "venue_list"
         title: "Venues"
         type: "list"
-        enabled: false
+        enabled: false  # superseded by the "View Venues" lazy drill-down button
         source: "venue_details"
         max_items: 50
         fields:

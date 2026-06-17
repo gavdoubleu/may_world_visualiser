@@ -77,3 +77,21 @@ def test_unit_people_404_on_unknown_unit(client_for):
     client = client_for(ctx)
     resp = client.get('/api/geography/unit/NoSuchUnit/people')
     assert resp.status_code == 404
+
+
+def test_unit_by_id_resolves_name(client_for):
+    ctx = WorldBuilder().add_unit('Norfolk', population=3).build_context()
+    client = client_for(ctx)
+    unit_id = ctx.world.geography.get_unit('Norfolk').id
+    resp = client.get(f'/api/geography/unit_by_id/{unit_id}')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['name'] == 'Norfolk'
+    assert data['id'] == unit_id
+
+
+def test_unit_by_id_404_on_unknown_id(client_for):
+    ctx = WorldBuilder().build_context()
+    client = client_for(ctx)
+    resp = client.get('/api/geography/unit_by_id/9999')
+    assert resp.status_code == 404

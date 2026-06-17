@@ -126,6 +126,26 @@ def get_unit_details(unit_name):
         return jsonify({'error': str(e)}), 500
 
 
+@geography_bp.route('/api/geography/unit_by_id/<int:unit_id>')
+def get_unit_name_by_id(unit_id):
+    """Resolve a GeoUnit's integer id to its name, for cross-nav (locate_venue/
+    locate_person return id; WorldMap's unit routes are name-keyed)."""
+    try:
+        world = get_app_context().world
+        if not world.geography:
+            return jsonify({'error': 'No geography data'}), 404
+
+        unit = world.geography.get_unit_by_id(unit_id)
+        if not unit:
+            return jsonify({'error': f'Unit id {unit_id} not found'}), 404
+
+        return jsonify({'id': unit.id, 'name': unit.name})
+
+    except Exception as e:
+        logger.error(f"Error resolving unit id {unit_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @geography_bp.route('/api/geography/unit/<unit_name>/people')
 def get_unit_people(unit_name):
     """Get list of people in a geographical unit's subtree, paginated.
@@ -147,7 +167,7 @@ def get_unit_people(unit_name):
             return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 50, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
         per_page = min(per_page, 200)
 
         return jsonify(ctx.record_reader.load_unit_people(unit.id, page, per_page))

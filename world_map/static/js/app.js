@@ -80,15 +80,6 @@ function getDefaultPanelConfig() {
                 {
                     enabled: true, type: 'distribution', title: 'Sex Distribution',
                     source: 'sex_distribution', denominator_field: 'population', show_percentage: true
-                },
-                {
-                    enabled: true, type: 'breakdown', title: 'Venue Types',
-                    source: 'venue_types', sort_by: 'count', sort_order: 'desc'
-                },
-                {
-                    enabled: true, type: 'list', title: 'Venues',
-                    source: 'venue_details', max_items: 50,
-                    fields: [{ name: 'name' }, { name: 'type' }]
                 }
             ]
         },
@@ -375,6 +366,10 @@ async function showUnitDetails(unitName, opts = {}) {
 
         const response = await fetch(`/api/geography/unit/${encodeURIComponent(unitName)}`);
         const unit = await response.json();
+
+        if (opts.flyTo && unit.coordinates && state.map) {
+            state.map.flyTo(unit.coordinates, state.map.getZoom());
+        }
 
         const panel = document.getElementById('info-panel');
         const content = document.getElementById('info-content');
