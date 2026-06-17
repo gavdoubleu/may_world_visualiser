@@ -375,14 +375,21 @@ async function showUnitDetails(unitName, opts = {}) {
         const content = document.getElementById('info-content');
 
         let html = WorldMap.buildDetailPanel(unit, 'geo_unit_panel', state.panelConfig?.geo_unit_panel);
-        html += `
-            <button class="section-button" onclick="WorldMap.showUnitVenues('${unitName}')">
-                View Venues &rarr;
-            </button>
-            <button class="section-button" onclick="WorldMap.showUnitPeople('${unitName}')">
-                View People &rarr;
-            </button>
-        `;
+
+        // Venues/People are lazy-fetched from live-only routes — the static
+        // export's fetch interceptor only serves the fixed pre-baked endpoint
+        // set, so these buttons would dead-end there. window.STATIC_WORLD_DATA
+        // is set only by export_static.py's exported bundle.
+        if (typeof window.STATIC_WORLD_DATA === 'undefined') {
+            html += `
+                <button class="section-button" onclick="WorldMap.showUnitVenues('${unitName}')">
+                    View Venues &rarr;
+                </button>
+                <button class="section-button" onclick="WorldMap.showUnitPeople('${unitName}')">
+                    View People &rarr;
+                </button>
+            `;
+        }
 
         if (typeof window.WorldMap?.getEventStatsHtmlForUnit === 'function') {
             const geoUnitId = state.geoUnitNameToId[unitName] ?? unit.id;
