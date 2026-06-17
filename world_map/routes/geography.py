@@ -142,14 +142,15 @@ def get_unit_people(unit_name):
         if not world.geography:
             return jsonify({'error': 'No geography data'}), 404
 
-        if not world.geography.get_unit(unit_name):
+        unit = world.geography.get_unit(unit_name)
+        if not unit:
             return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 50, type=int)
         per_page = min(per_page, 200)
 
-        return jsonify(ctx.record_reader.load_unit_people(unit_name, page, per_page))
+        return jsonify(ctx.record_reader.load_unit_people(unit.id, page, per_page))
 
     except Exception as e:
         logger.error(f"Error getting people for unit {unit_name}: {e}")

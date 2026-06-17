@@ -513,8 +513,11 @@ def _build_html(
     css_style: str,
     css_events: str,
     js_utils: str,
+    js_panel_navigator: str,
     js_panel_builders: str,
     js_geography: str,
+    js_venues: str,
+    js_venue_detail: str,
     js_people: str,
     js_app: str,
     js_events: str,
@@ -637,10 +640,19 @@ window.STATIC_WORLD_DATA = {data_json};
 {js_utils}
     </script>
     <script>
+{js_panel_navigator}
+    </script>
+    <script>
 {js_panel_builders}
     </script>
     <script>
 {js_geography}
+    </script>
+    <script>
+{js_venues}
+    </script>
+    <script>
+{js_venue_detail}
     </script>
     <script>
 {js_people}
@@ -874,12 +886,15 @@ def main() -> None:
     css_style  = (static_dir / 'css' / 'style.css').read_text(encoding='utf-8')
     css_events = (static_dir / 'css' / 'events.css').read_text(encoding='utf-8')
     js_utils          = (static_dir / 'js' / 'utils.js').read_text(encoding='utf-8')
+    js_panel_navigator = (static_dir / 'js' / 'panel_navigator.js').read_text(encoding='utf-8')
     js_panel_builders = (static_dir / 'js' / 'panel_builders.js').read_text(encoding='utf-8')
     js_geography      = (static_dir / 'js' / 'geography.js').read_text(encoding='utf-8')
+    js_venues         = (static_dir / 'js' / 'venues.js').read_text(encoding='utf-8')
+    js_venue_detail   = (static_dir / 'js' / 'venue_detail.js').read_text(encoding='utf-8')
     js_people         = (static_dir / 'js' / 'people.js').read_text(encoding='utf-8')
     js_app            = (static_dir / 'js' / 'app.js').read_text(encoding='utf-8')
     js_events         = (static_dir / 'js' / 'events.js').read_text(encoding='utf-8')
-    print('  style.css, events.css, utils.js, panel_builders.js, geography.js, people.js, app.js, events.js — OK')
+    print('  style.css, events.css, utils.js, panel_navigator.js, panel_builders.js, geography.js, venues.js, venue_detail.js, people.js, app.js, events.js — OK')
     from world_map.context import get_app_context
     with flask_app.app_context():
         theme = get_app_context().app_config.theme
@@ -907,8 +922,11 @@ def main() -> None:
         css_style=css_style,
         css_events=css_events,
         js_utils=js_utils,
+        js_panel_navigator=js_panel_navigator,
         js_panel_builders=js_panel_builders,
         js_geography=js_geography,
+        js_venues=js_venues,
+        js_venue_detail=js_venue_detail,
         js_people=js_people,
         js_app=js_app,
         js_events=js_events,

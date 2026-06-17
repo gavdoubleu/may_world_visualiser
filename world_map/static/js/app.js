@@ -369,8 +369,10 @@ async function loadGeographyLevel(level) {
 // DETAIL PANEL
 // =============================================================================
 
-async function showUnitDetails(unitName) {
+async function showUnitDetails(unitName, opts = {}) {
     try {
+        if (!opts.fromNav) WorldMap.panelNavigator.reset({ type: 'unit', unitName });
+
         const response = await fetch(`/api/geography/unit/${encodeURIComponent(unitName)}`);
         const unit = await response.json();
 
@@ -378,6 +380,14 @@ async function showUnitDetails(unitName) {
         const content = document.getElementById('info-content');
 
         let html = WorldMap.buildDetailPanel(unit, 'geo_unit_panel', state.panelConfig?.geo_unit_panel);
+        html += `
+            <button class="section-button" onclick="WorldMap.showUnitVenues('${unitName}')">
+                View Venues &rarr;
+            </button>
+            <button class="section-button" onclick="WorldMap.showUnitPeople('${unitName}')">
+                View People &rarr;
+            </button>
+        `;
 
         if (typeof window.WorldMap?.getEventStatsHtmlForUnit === 'function') {
             const geoUnitId = state.geoUnitNameToId[unitName] ?? unit.id;
@@ -393,6 +403,25 @@ async function showUnitDetails(unitName) {
     }
 }
 
+// Re-renders whichever view is current on the PanelNavigator stack — the one
+// dispatch point all "back" buttons call, so cross-navigation (e.g. Person ->
+// Venue -> back) always returns to the real predecessor, not a fixed ancestor.
+function renderPanelView(view) {
+    switch (view.type) {
+        case 'unit':   return showUnitDetails(view.unitName, { fromNav: true });
+        case 'venues': return WorldMap.showUnitVenues(view.unitName, { fromNav: true });
+        case 'people': return WorldMap.showUnitPeople(view.unitName, view.page, { fromNav: true });
+        case 'person': return WorldMap.showPersonDetails(view.personId, { fromNav: true });
+        case 'venue':  return WorldMap.showVenueDetails(view.venueId, { fromNav: true });
+        default:
+            console.warn(`Unknown panel view type: ${view.type}`);
+    }
+}
+
+function goBackPanelView() {
+    return renderPanelView(WorldMap.panelNavigator.pop());
+}
+
 // Expose functions needed by onclick handlers and other modules
 // (people.js attaches showUnitPeople / showPersonDetails itself)
-Object.assign(window.WorldMap, { selectGeographyLevel, showUnitDetails });
+Object.assign(window.WorldMap, { selectGeographyLevel, showUnitDetails, renderPanelView, goBackPanelView });

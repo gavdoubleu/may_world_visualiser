@@ -90,12 +90,13 @@ def create_app(world, hdf5_path, map_config=None, config_path=None):
     from world_map.routes.geography import geography_bp
     from world_map.routes.population import population_bp
     from world_map.routes.venues import venues_bp
+    from world_map.routes.venue_browse import venue_browse_bp
     from world_map.routes.events import events_bp
     from world_map.routes.config_routes import config_bp
 
     return make_app(
         __name__,
-        blueprints=[geography_bp, population_bp, venues_bp, events_bp, config_bp],
+        blueprints=[geography_bp, population_bp, venues_bp, venue_browse_bp, events_bp, config_bp],
         context=context,
         context_key=_CTX_KEY,
     )

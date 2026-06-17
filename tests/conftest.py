@@ -7,10 +7,11 @@ from world_map.context import AppContext, _CTX_KEY
 from world_map.routes.geography import geography_bp
 from world_map.routes.events import events_bp
 from world_map.routes.venues import venues_bp
+from world_map.routes.venue_browse import venue_browse_bp
 from world_map.routes.config_routes import config_bp
 from world_map.routes.population import population_bp
 
-_ALL_BLUEPRINTS = [geography_bp, events_bp, venues_bp, config_bp, population_bp]
+_ALL_BLUEPRINTS = [geography_bp, events_bp, venues_bp, venue_browse_bp, config_bp, population_bp]
 
 
 @pytest.fixture

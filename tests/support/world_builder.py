@@ -29,6 +29,8 @@ class WorldBuilder:
     def __init__(self) -> None:
         self._units: list[dict] = []
         self._levels: list[str] = []
+        self._venues: list[dict] = []
+        self._venue_subsets: list[dict] = []
         self._person_id_to_idx_override: np.ndarray | None = None
         self._subset_venue_ids_override: np.ndarray | None = None
         self._venue_ids_override: np.ndarray | None = None
@@ -69,6 +71,36 @@ class WorldBuilder:
         self._units.append(dict(
             name=name, level=level, coordinates=coordinates,
             population=population, parent=parent,
+        ))
+        return self
+
+    def add_venue(
+        self,
+        name: str,
+        venue_type: str,
+        geo_unit: str,
+        coordinates: tuple[float, float] | None = None,
+        parent: str | None = None,
+    ) -> 'WorldBuilder':
+        """Add a Venue assigned to `geo_unit` (by GeoUnit name). If `parent`
+        is given (another Venue's name), this becomes a ChildVenue of it."""
+        self._venues.append(dict(
+            name=name, type=venue_type, geo_unit=geo_unit,
+            coordinates=coordinates, parent=parent,
+        ))
+        return self
+
+    def add_subset(
+        self,
+        venue_name: str,
+        subset_name: str,
+        member_person_ids: list[int],
+    ) -> 'WorldBuilder':
+        """Assign `member_person_ids` (logical Person IDs, 0-indexed in the
+        order people were created across add_unit calls) to a Subset of an
+        already-added Venue."""
+        self._venue_subsets.append(dict(
+            venue=venue_name, name=subset_name, members=list(member_person_ids),
         ))
         return self
 
@@ -116,16 +148,56 @@ class WorldBuilder:
             f.create_dataset('population/geo_unit_ids',
                              data=np.array(person_geo_unit_ids, dtype=np.int32))
 
-            f.create_dataset('venues/ids', data=np.array([], dtype=np.int32))
-            f.create_dataset('venues/geo_unit_ids', data=np.array([], dtype=np.int32))
-            f.create_dataset('venues/types', data=np.array([], dtype=np.uint8))
-            f.create_dataset('venues/latitudes', data=np.array([], dtype=np.float32))
-            f.create_dataset('venues/longitudes', data=np.array([], dtype=np.float32))
-            f.create_dataset('metadata/names/venues', data=np.array([], dtype=dt))
-            f.create_dataset('metadata/registries/venue_types', data=np.array([], dtype=dt))
-            f.create_dataset('venues/subsets/venue_ids', data=np.array([], dtype=np.int32))
-            f.create_dataset('venues/subsets/member_counts', data=np.array([], dtype=np.int32))
-            f.create_dataset('metadata/names/subsets', data=np.array([], dtype=dt))
+            venue_name_to_index = {v['name']: i for i, v in enumerate(self._venues)}
+            venue_types = sorted({v['type'] for v in self._venues})
+
+            venue_ids        = np.arange(len(self._venues), dtype=np.int32)
+            venue_parent_ids = np.array(
+                [venue_name_to_index[v['parent']] if v['parent'] else -1
+                 for v in self._venues], dtype=np.int32)
+            venue_type_codes = np.array(
+                [venue_types.index(v['type']) for v in self._venues], dtype=np.uint8)
+            venue_geo_unit_ids = np.array(
+                [name_to_index[v['geo_unit']] for v in self._venues], dtype=np.int32)
+            venue_lats = np.array(
+                [v['coordinates'][0] if v['coordinates'] else np.nan
+                 for v in self._venues], dtype=np.float64)
+            venue_lons = np.array(
+                [v['coordinates'][1] if v['coordinates'] else np.nan
+                 for v in self._venues], dtype=np.float64)
+            venue_names = np.array([v['name'].encode() for v in self._venues], dtype=dt)
+            venue_type_names = np.array([t.encode() for t in venue_types], dtype=dt)
+
+            f.create_dataset('venues/ids', data=venue_ids)
+            f.create_dataset('venues/parent_ids', data=venue_parent_ids)
+            f.create_dataset('venues/geo_unit_ids', data=venue_geo_unit_ids)
+            f.create_dataset('venues/types', data=venue_type_codes)
+            f.create_dataset('venues/latitudes', data=venue_lats)
+            f.create_dataset('venues/longitudes', data=venue_lons)
+            f.create_dataset('metadata/names/venues', data=venue_names)
+            f.create_dataset('metadata/registries/venue_types', data=venue_type_names)
+
+            subset_entries = sorted(
+                self._venue_subsets, key=lambda s: venue_name_to_index[s['venue']])
+
+            subset_venue_ids = np.array(
+                [venue_name_to_index[s['venue']] for s in subset_entries], dtype=np.int32)
+            subset_names = np.array([s['name'].encode() for s in subset_entries], dtype=dt)
+            member_counts = np.array([len(s['members']) for s in subset_entries], dtype=np.int32)
+
+            offsets: list[int] = []
+            flat: list[int] = []
+            for s in subset_entries:
+                offsets.append(len(flat))
+                flat.extend(s['members'])
+
+            f.create_dataset('venues/subsets/venue_ids', data=subset_venue_ids)
+            f.create_dataset('venues/subsets/member_counts', data=member_counts)
+            f.create_dataset('metadata/names/subsets', data=subset_names)
+            f.create_dataset('venues/subsets/members_offsets',
+                             data=np.array(offsets, dtype=np.int64))
+            f.create_dataset('venues/subsets/members_flat',
+                             data=np.array(flat, dtype=np.int64))
 
     def build_world(self, compute_activity_stats: bool = False) -> WorldStore:
         """Write a synthetic HDF5 and build it into a WorldStore.

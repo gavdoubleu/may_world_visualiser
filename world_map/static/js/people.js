@@ -8,8 +8,9 @@ const peopleState = {
     totalPages: 0
 };
 
-async function showUnitPeople(unitName, page = 1) {
+async function showUnitPeople(unitName, page = 1, opts = {}) {
     try {
+        if (!opts.fromNav) WorldMap.panelNavigator.push({ type: 'people', unitName, page });
         peopleState.currentUnit = unitName;
         peopleState.currentPage = page;
 
@@ -33,7 +34,7 @@ async function showUnitPeople(unitName, page = 1) {
             <h2>People in ${unitName}</h2>
             <p class="people-count">${data.total_count.toLocaleString()} people total</p>
 
-            <button class="back-button" onclick="WorldMap.showUnitDetails('${unitName}')">
+            <button class="back-button" onclick="WorldMap.goBackPanelView()">
                 &larr; Back to Unit Details
             </button>
 
@@ -95,8 +96,9 @@ async function showUnitPeople(unitName, page = 1) {
     }
 }
 
-async function showPersonDetails(personId) {
+async function showPersonDetails(personId, opts = {}) {
     try {
+        if (!opts.fromNav) WorldMap.panelNavigator.push({ type: 'person', personId });
         const response = await fetch(`/api/population/person/${personId}`);
         const person = await response.json();
 
@@ -111,7 +113,7 @@ async function showPersonDetails(personId) {
         let html = `
             <h2>Person #${person.id}</h2>
 
-            <button class="back-button" onclick="WorldMap.showUnitPeople('${peopleState.currentUnit}', ${peopleState.currentPage})">
+            <button class="back-button" onclick="WorldMap.goBackPanelView()">
                 &larr; Back to People List
             </button>
 

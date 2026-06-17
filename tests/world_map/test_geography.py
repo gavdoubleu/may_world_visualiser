@@ -60,3 +60,20 @@ def test_geography_unit_detail_stats(client_for):
     assert data['slim_mode'] is True
     assert '25-34' in data['age_distribution']
     assert 'male' in data['sex_distribution']  # world_reader decodes sex codes to labels
+
+
+def test_unit_people_returns_paginated_residents(client_for):
+    ctx = WorldBuilder().add_unit('Norfolk', population=3).build_context()
+    client = client_for(ctx)
+    resp = client.get('/api/geography/unit/Norfolk/people')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['total_count'] == 3
+    assert len(data['people']) == 3
+
+
+def test_unit_people_404_on_unknown_unit(client_for):
+    ctx = WorldBuilder().build_context()
+    client = client_for(ctx)
+    resp = client.get('/api/geography/unit/NoSuchUnit/people')
+    assert resp.status_code == 404

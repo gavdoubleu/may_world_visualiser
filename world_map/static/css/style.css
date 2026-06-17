@@ -456,6 +456,24 @@ header h1 {
     color: var(--theme-bg);
 }
 
+.section-button {
+    display: inline-block;
+    padding: 8px 16px;
+    background: var(--theme-accent);
+    color: var(--theme-bg);
+    border: 1px solid var(--theme-accent);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 15px;
+}
+
+.section-button:hover {
+    background: var(--theme-surface-raised);
+    color: var(--theme-accent);
+}
+
 /* People List */
 .people-count {
     color: var(--theme-text-muted);
@@ -508,6 +526,48 @@ header h1 {
 
 .view-link {
     color: var(--theme-accent);
+    font-size: 0.8rem;
+}
+
+/* Venues List */
+.venue-type-group {
+    margin-bottom: 8px;
+}
+
+.venue-type-toggle {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--theme-surface-raised);
+    color: var(--theme-text);
+    border: 1px solid var(--theme-border);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.venue-type-toggle:hover {
+    background: var(--theme-table-row-hover);
+}
+
+.venue-list {
+    margin: 8px 0 0 12px;
+}
+
+.venue-item {
+    padding: 8px;
+    border-bottom: 1px solid var(--theme-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--theme-text);
+}
+
+.venue-child-count {
+    color: var(--theme-text-muted);
     font-size: 0.8rem;
 }
 
