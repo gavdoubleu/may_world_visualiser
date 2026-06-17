@@ -38,8 +38,8 @@ projection:
 # Set enabled: false (or omit this block) to show raw IDs.
 
 geo_unit_names:
-  enabled: false
-  csv_path: ../data/Geo_unit_names.csv   # relative to this config file's directory
+  enabled: true
+  csv_path: ../../my_may/world_specific_code/MedievalYaml/data/Population Distribution in Medieval England(MergedManors).csv
   id_column: MBD_Temp_ID
   name_column: Name
 
