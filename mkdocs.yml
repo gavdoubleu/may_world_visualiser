@@ -27,9 +27,6 @@ nav:
       - WorldMap & Static Export: user_guide/world_map.md
       - WorldExplorer: user_guide/world_explorer.md
   - Architecture: architecture.md
-  - Decision Records:
-      - "ADR 0001: Lazy HDF5 backend": adr/0001-worldexplorer-lazy-hdf5-backend.md
-      - "ADR 0002: Unified lazy backend": adr/0002-unified-lazy-hdf5-backend.md
   - API Reference: reference/
 
 plugins:

@@ -99,5 +99,10 @@ may_world_visualiser/
 ├── world_map/
 │   └── yaml/                 # config files (config.yaml, themes, panels)
 ├── world_explorer/           # WorldExplorer package
-└── world_reader/             # shared HDF5 backend
+├── world_reader/             # shared HDF5 backend
+└── webapp_utilities/         # shared Flask helpers (theming, app factory)
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).

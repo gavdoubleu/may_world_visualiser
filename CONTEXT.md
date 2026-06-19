@@ -36,7 +36,7 @@ Interactive map-based visualisation of a world file. Renders GeoUnits and Venues
 **WorldExplorer** (`world_explorer/`)
 File-explorer-style browser interface for inspecting a world file. Left pane shows the GeoUnit hierarchy as a collapsible tree. Right pane shows UnitStats, a paginated Venue list (grouped by VenueType, inline-expandable), and a paginated People list (inline-expandable slim detail). Both Venues and People have a "View full details" button that opens the Detail Panel. Flask app; launched via `launch_world_explorer.py` on port 5001.
 
-Both WorldMap and WorldExplorer run on the same shared lazy backend in `world_reader/` (`WorldStore` + `RecordReader`): neither materialises Person, Venue or Subset as in-memory objects. Only the GeoUnit hierarchy and aggregate UnitStats are held resident; individual Person/Venue/Subset records are served on demand from HDF5. See ADR 0002.
+Both WorldMap and WorldExplorer run on the same shared lazy backend in `world_reader/` (`WorldStore` + `RecordReader`): neither materialises Person, Venue or Subset as in-memory objects. Only the GeoUnit hierarchy and aggregate UnitStats are held resident; individual Person/Venue/Subset records are served on demand from HDF5.
 
 Pagination follows two intentional patterns: routes/tests holding a fully materialised list use `paginate`/`PaginationSlice` (`world_reader/pagination.py`); `RecordReader` hand-slices numpy arrays/HDF5 datasets directly (reusing only `calc_total_pages`) so it never has to materialise a full array just to re-slice it.
 
