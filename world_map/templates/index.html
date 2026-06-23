@@ -14,7 +14,7 @@
         <!-- Header -->
         <header>
             <img id="app-logo" src="{{ logo_url }}" alt="Logo"{% if logo_url %} style="display:block;"{% endif %}>
-            <h1 id="app-title">World Map Visualization</h1>
+            <h1 id="app-title"></h1>
             <div id="stats-summary"></div>
         </header>
 
@@ -52,7 +52,7 @@
             const theme = await response.json();
 
             const titleEl = document.getElementById('app-title');
-            if (titleEl && theme.title) {
+            if (titleEl && theme.title !== undefined) {
                 titleEl.textContent = theme.title;
             }
 

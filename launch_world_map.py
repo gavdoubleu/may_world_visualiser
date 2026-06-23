@@ -238,7 +238,7 @@ Examples:
             print(f"\nWARNING: Events file not found: {events_path}")
 
     print("\n" + "=" * 60)
-    print("🗺️  World Map Visualization")
+    print("World Map Visualization")
     print("=" * 60)
     print(f"\nStarting server at http://{args.host}:{args.port}")
     print("\nPress Ctrl+C to stop the server")
