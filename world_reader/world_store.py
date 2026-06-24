@@ -75,6 +75,7 @@ class WorldStore:
         subtree_index (SubtreeIndex): O(1) subtree row-range lookups.
         venue_types_arr: Per-venue type code array.
         venue_type_names: Type names indexed by code.
+        activity_names: Activity type names indexed by code.
         venue_list_position: Per-venue rank within its direct unit's
             top-level, type-filtered venue listing.
         person_list_position: Per-person rank within their direct unit's
@@ -100,7 +101,7 @@ class WorldStore:
                  venue_parent_ids=None, venue_child_counts=None,
                  venue_child_total_members=None, venue_child_position=None,
                  children_by_parent_sorted=None, children_parent_ids_sorted=None,
-                 venue_ids=None, venue_id_to_idx=None):
+                 venue_ids=None, venue_id_to_idx=None, activity_names=None):
         self.geography = geography
         self._slim_statistics = slim_statistics
         self._unit_statistics = unit_statistics
@@ -112,6 +113,7 @@ class WorldStore:
         self.subtree_index = subtree_index
         self.venue_types_arr      = venue_types_arr
         self.venue_type_names     = venue_type_names
+        self.activity_names       = activity_names
         self.venue_list_position  = venue_list_position
         self.person_list_position = person_list_position
         self.venue_parent_ids             = venue_parent_ids
@@ -363,6 +365,11 @@ def build_world_store(input_file: str | Path, compute_activity_stats: bool = Fal
             venue_type_names = [n.decode() if isinstance(n, bytes) else str(n)
                                 for n in f['metadata/registries/venue_types'][:]]
 
+        activity_names = []
+        if 'activity_mappings/activity_map/activity_names' in f:
+            activity_names = [n.decode() if isinstance(n, bytes) else str(n)
+                              for n in f['activity_mappings/activity_map/activity_names'][:]]
+
         num_venues = len(venue_types_arr)
         raw_parent_ids = (f['venues/parent_ids'][:]
                           if 'venues/parent_ids' in f
@@ -424,6 +431,7 @@ def build_world_store(input_file: str | Path, compute_activity_stats: bool = Fal
         children_parent_ids_sorted=children_parent_ids_sorted,
         venue_ids=venue_ids,
         venue_id_to_idx=venue_id_to_idx,
+        activity_names=activity_names,
     )
     logger.info("World store built in %.2fs: %s",
                 time.perf_counter() - t_start, world)

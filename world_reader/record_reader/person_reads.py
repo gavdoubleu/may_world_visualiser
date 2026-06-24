@@ -2,6 +2,7 @@
 
 import h5py
 import numpy as np
+import pandas as pd
 
 from world_reader.convert import SEX_DECODE, decode_str
 from world_reader.id_index import IdIndex
@@ -39,45 +40,81 @@ class _PersonReads:
             if start >= end:
                 return []
 
-            act_data         = f['activity_mappings/activity_map/activity_data'][start:end]
-            act_names        = f['activity_mappings/activity_map/activity_names'][:]
-            venue_names      = f['metadata/names/venues']
-            subset_names     = f['metadata/names/subsets']
-            venue_types      = f['venues/types']
-            venue_type_names = [decode_str(n) for n in f['metadata/registries/venue_types'][:]]
-            venue_geo_ids    = f['venues/geo_unit_ids']
+            act_data      = f['activity_mappings/activity_map/activity_data'][start:end]
+            venue_names   = f['metadata/names/venues']
+            subset_names  = f['metadata/names/subsets']
+            venue_geo_ids = f['venues/geo_unit_ids']
 
-            activities = []
-            for row in act_data:
-                act_type_idx = int(row[1])
-                venue_row    = int(row[2])
-                subset_pos   = int(row[3])
+            act_type_idx = act_data[:, 1]
+            venue_row    = act_data[:, 2]
+            subset_pos   = act_data[:, 3]
 
-                act_name   = decode_str(act_names[act_type_idx])
-                venue_name = decode_str(venue_names[venue_row])
-                vtype_idx  = int(venue_types[venue_row])
-                venue_type = venue_type_names[vtype_idx] if vtype_idx < len(venue_type_names) else 'unknown'
+            # venue_type: WorldStore already holds this resident (built at
+            # cold start) — a plain in-memory numpy gather, no HDF5 read and
+            # no ordering constraint (h5py's fancy-index ordering rule below
+            # only applies to on-disk reads, not numpy array indexing).
+            venue_type_idx = self._venue_types_arr[venue_row]
 
-                venue_geo_id  = int(venue_geo_ids[venue_row])
-                venue_unit    = self._geography.units_by_id.get(venue_geo_id)
-                venue_geo_unit = venue_unit.name if venue_unit else str(venue_geo_id)
+            # venue_name / venue_geo_id: dedup before reading. h5py's
+            # fancy-indexed reads require increasing, de-duplicated index
+            # order (see load_venue_members's argsort/unsort workaround for
+            # the same constraint) — np.unique's sorted+unique output
+            # satisfies that for free, and as a bonus collapses repeat
+            # visits to the same venue (e.g. "home" appearing many times in
+            # one person's activities) to a single HDF5 read instead of one
+            # read per activity.
+            unique_venues, venue_inverse = np.unique(venue_row, return_inverse=True)
+            venue_idx      = unique_venues.tolist()
+            venue_name_u   = pd.Series(venue_names[venue_idx]).str.decode('utf-8').to_numpy()
+            venue_geo_id_u = venue_geo_ids[venue_idx]
+            venue_name    = venue_name_u[venue_inverse]
+            venue_geo_id  = venue_geo_id_u[venue_inverse]
 
-                first_sub = int(np.searchsorted(self._subset_venue_ids, venue_row, side='left'))
-                last_sub  = int(np.searchsorted(self._subset_venue_ids, venue_row, side='right'))
-                if first_sub < last_sub:
-                    subset_row  = first_sub + subset_pos
-                    subset_name = decode_str(subset_names[subset_row])
-                else:
-                    subset_name = str(subset_pos)
+            # subset_name: a *second*, separate dedup stage chained off the
+            # venue dedup above — not the same single-pass mechanism as
+            # venue_name/venue_geo_id, because a subset_row can only be
+            # computed once each unique venue's own first_sub/last_sub block
+            # is known. So: resolve first_sub/last_sub per unique venue
+            # in-memory (self._subset_venue_ids is already resident), scatter
+            # back to every activity to get subset_row, then dedup *that*
+            # before the one HDF5 read.
+            first_sub_u = np.searchsorted(self._subset_venue_ids, unique_venues, side='left')
+            last_sub_u  = np.searchsorted(self._subset_venue_ids, unique_venues, side='right')
+            first_sub   = first_sub_u[venue_inverse]
+            has_subset  = first_sub < last_sub_u[venue_inverse]
 
-                activities.append({
-                    'activity_name':  act_name,
-                    'venue_id':       int(self._venue_ids[venue_row]),
-                    'venue_name':     venue_name,
-                    'venue_type':     venue_type,
-                    'venue_geo_unit': venue_geo_unit,
-                    'subset_name':    subset_name,
-                })
+            subset_row = np.where(has_subset, first_sub + subset_pos, -1)
+            valid      = subset_row >= 0
+            unique_subset_rows, subset_inverse = np.unique(subset_row[valid], return_inverse=True)
+            subset_name_u = pd.Series(
+                subset_names[unique_subset_rows.tolist()]).str.decode('utf-8').to_numpy()
+
+            subset_name = np.empty(len(act_data), dtype=object)
+            subset_name[valid]  = subset_name_u[subset_inverse]
+            subset_name[~valid] = [str(p) for p in subset_pos[~valid]]  # no-subset fallback
+
+            act_name = [self._activity_names_cache[idx] for idx in act_type_idx]
+            venue_id = self._venue_ids[venue_row]
+            venue_type = [self._venue_type_names_cache[t]
+                         if t < len(self._venue_type_names_cache) else 'unknown'
+                         for t in venue_type_idx]
+            venue_geo_unit = []
+            for geo_id in venue_geo_id:
+                unit = self._geography.units_by_id.get(int(geo_id))
+                venue_geo_unit.append(unit.name if unit else str(int(geo_id)))
+
+            # DataFrame index is 0..N-1 (act_data row order) throughout —
+            # np.unique's return_inverse reconstructs original order by
+            # construction, so to_dict('records') preserves activity order
+            # exactly as stored, not sorted by venue.
+            activities = pd.DataFrame({
+                'activity_name':  act_name,
+                'venue_id':       venue_id,
+                'venue_name':     venue_name,
+                'venue_type':     venue_type,
+                'venue_geo_unit': venue_geo_unit,
+                'subset_name':    subset_name,
+            }).to_dict('records')
 
         return activities
 

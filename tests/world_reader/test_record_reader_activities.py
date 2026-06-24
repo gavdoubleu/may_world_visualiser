@@ -9,63 +9,40 @@ from world_reader import RecordReader
 
 
 @pytest.fixture
-def person_activities_h5(tmp_path):
-    """Minimal HDF5 for testing load_person_activities.
+def loader():
+    """RecordReader over a builder-generated world, with one activity grafted
+    on (the builder has no add_activity API — activity_mappings datasets are
+    appended to the builder's own HDF5 file after the fact).
 
     Two people: id=5 at array index 0, id=3 at array index 1.
     Person id=5 has one activity: act_type=0 ('work'), venue row=0
-      (logical venue id=7, 'office'), subset_pos=0 ('desk'), venue geo_unit=10.
+      (logical venue id=7, 'office'), subset_pos=0 ('desk').
     Person id=3 has no activities.
 
     Logical venue id (7) deliberately differs from its row index (0), so a
     test that asserts on the logical id catches row-index leaks.
     """
-    h5_path = tmp_path / 'activities_test.h5'
-    with h5py.File(h5_path, 'w') as f:
-        # population: array order [id=5, id=3]
-        f.create_dataset('population/ids',  data=np.array([5, 3], dtype=np.int32))
+    world = (WorldBuilder()
+             .add_unit('Geo', population=2)
+             .add_venue('office', 'workplace', geo_unit='Geo')
+             .add_subset('office', 'desk', member_person_ids=[5])
+             .with_person_id_to_idx(np.array([5, 3], dtype=np.int64))
+             .with_venue_id_to_idx(np.array([7], dtype=np.int64))
+             .build_world())
 
-        # activity offsets: person at idx 0 has activities [0,1), idx 1 has [1,1)
+    dt = h5py.string_dtype()
+    with h5py.File(world._builder_hdf5_path, 'a') as f:
         f.create_dataset('activity_mappings/activity_map/activity_offsets',
                          data=np.array([0, 1], dtype=np.int64))
-        # activity_data row: [person_array_idx, act_type_idx, venue_id, subset_pos]
         f.create_dataset('activity_mappings/activity_map/activity_data',
                          data=np.array([[0, 0, 0, 0]], dtype=np.int32))
-
-        dt = h5py.string_dtype()
         f.create_dataset('activity_mappings/activity_map/activity_names',
                          data=np.array([b'work'], dtype=dt))
-        f.create_dataset('metadata/names/venues',
-                         data=np.array([b'office'], dtype=dt))
-        f.create_dataset('metadata/names/subsets',
-                         data=np.array([b'desk'], dtype=dt))
-        f.create_dataset('metadata/registries/venue_types',
-                         data=np.array([b'workplace'], dtype=dt))
-        f.create_dataset('venues/types',
-                         data=np.array([0], dtype=np.int32))
-        f.create_dataset('venues/geo_unit_ids',
-                         data=np.array([10], dtype=np.int32))
-        f.create_dataset('venues/ids',
-                         data=np.array([7], dtype=np.int32))
+    world.activity_names = ['work']
 
-        # subset venue mapping: venue 0 has one subset at row 0
-        f.create_dataset('venues/subsets/venue_ids',
-                         data=np.array([0], dtype=np.int32))
-    return h5_path
-
-
-@pytest.fixture
-def loader(person_activities_h5):
-    # population/ids in row order: id=5 at row 0, id=3 at row 1
-    person_ids_in_row_order = np.array([5, 3], dtype=np.int64)
-    subset_venue_ids = np.array([0], dtype=np.int64)
-    venue_ids_in_row_order = np.array([7], dtype=np.int64)
-    world = (WorldBuilder()
-             .with_person_id_to_idx(person_ids_in_row_order)
-             .with_subset_venue_ids(subset_venue_ids)
-             .with_venue_id_to_idx(venue_ids_in_row_order)
-             .build_world())
-    return RecordReader(person_activities_h5, world)
+    record_reader = RecordReader(world._builder_hdf5_path, world)
+    record_reader._test_world = world  # keep world's tmpdir (and its .h5) alive
+    return record_reader
 
 
 def test_load_person_activities_returns_correct_record(loader):
@@ -87,6 +64,58 @@ def test_load_person_activities_empty_for_no_activities(loader):
 
 def test_load_person_activities_returns_none_for_unknown_id(loader):
     assert loader.load_person_activities(999) is None
+
+
+def test_load_person_activities_high_count_repeated_venues_preserves_order():
+    """A person with many activities against a small, repeated set of venues
+    (the case the np.unique/return_inverse dedup-and-scatter rewrite targets),
+    visited in deliberately non-monotonic order.
+
+    Exercises two risks specific to the dedup rewrite: (1) values gathered
+    via the deduped/sorted unique-venue read must scatter back to the
+    *correct* original row, and (2) the returned list's order must match
+    activity_data row order exactly, not sorted-by-venue order.
+    """
+    venue_names      = ['home', 'work', 'school', 'gym']
+    venue_types      = ['household', 'workplace', 'education', 'leisure']
+    subset_names     = ['residents', 'desk', 'class', 'members']
+
+    world = WorldBuilder().add_unit('Geo', population=1)
+    for venue_name, venue_type, subset_name in zip(venue_names, venue_types, subset_names):
+        world = world.add_venue(venue_name, venue_type, geo_unit='Geo')
+        world = world.add_subset(venue_name, subset_name, member_person_ids=[0])
+    world = world.build_world()
+
+    # non-monotonic, repeated venue-row visit order — deliberately not sorted
+    venue_row_sequence = ([3, 0, 2, 0, 1, 3, 0] * 9)[:60]
+    activity_data = np.array(
+        [[0, 0, venue_row, 0] for venue_row in venue_row_sequence], dtype=np.int32)
+
+    dt = h5py.string_dtype()
+    with h5py.File(world._builder_hdf5_path, 'a') as f:
+        f.create_dataset('activity_mappings/activity_map/activity_offsets',
+                         data=np.array([0], dtype=np.int64))
+        f.create_dataset('activity_mappings/activity_map/activity_data', data=activity_data)
+        f.create_dataset('activity_mappings/activity_map/activity_names',
+                         data=np.array([b'commute'], dtype=dt))
+    world.activity_names = ['commute']
+
+    record_reader = RecordReader(world._builder_hdf5_path, world)
+    record_reader._test_world = world  # keep world's tmpdir (and its .h5) alive
+
+    activities = record_reader.load_person_activities(0)
+    assert activities is not None
+    assert len(activities) == len(venue_row_sequence)
+
+    for activity, venue_row in zip(activities, venue_row_sequence):
+        assert activity['activity_name']  == 'commute'
+        assert activity['venue_id']       == venue_row  # default builder ids == row index
+        assert activity['venue_name']     == venue_names[venue_row]
+        assert activity['venue_type']     == venue_types[venue_row]
+        assert activity['subset_name']    == subset_names[venue_row]
+
+    # order must match activity_data row order, not sorted-by-venue order
+    assert [a['venue_name'] for a in activities] == [venue_names[v] for v in venue_row_sequence]
 
 
 # --- lazy subtree-backed reads (build_world_store end-to-end) ---

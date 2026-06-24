@@ -42,6 +42,7 @@ class RecordReader(_PersonReads, _VenueReads):
         self._geographical_distribution = store.geographical_distribution
         self._venue_types_arr     = store.venue_types_arr
         self._venue_type_names_cache = store.venue_type_names or []
+        self._activity_names_cache   = store.activity_names or []
         self._venue_list_position = store.venue_list_position
         self._person_list_position = store.person_list_position
         self._venue_parent_ids           = store.venue_parent_ids

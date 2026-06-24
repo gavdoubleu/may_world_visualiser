@@ -2,6 +2,7 @@
 
 import h5py
 import numpy as np
+import pandas as pd
 
 from world_reader.convert import SEX_DECODE, decode_str
 from world_reader.id_index import IdIndex
@@ -41,8 +42,11 @@ class _VenueReads:
             return {'venue_id': venue_id, 'venue_name': str(venue_id), 'subsets': []}
 
         with h5py.File(self._hdf5_path, 'r') as f:
-            venue_name       = decode_str(f['metadata/names/venues'][row])
-            subset_names_arr = f['metadata/names/subsets']
+            venue_name      = decode_str(f['metadata/names/venues'][row])
+            # contiguous slice — first_sub:last_sub is one venue's own subset
+            # block, so no fancy-indexing/ordering concern here.
+            subset_names    = pd.Series(
+                f['metadata/names/subsets'][first_sub:last_sub]).str.decode('utf-8').tolist()
             members_offsets  = f['venues/subsets/members_offsets']
             members_flat     = f['venues/subsets/members_flat']
             n_subsets        = len(members_offsets)
@@ -55,7 +59,7 @@ class _VenueReads:
 
             result_subsets = []
             for subset_row in range(first_sub, last_sub):
-                sname = decode_str(subset_names_arr[subset_row])
+                sname = subset_names[subset_row - first_sub]
 
                 if subset_filter and sname != subset_filter:
                     continue
@@ -143,7 +147,7 @@ class _VenueReads:
         rows = np.sort(self._subtree_index.venue_rows(unit.id))
 
         with h5py.File(self._hdf5_path, 'r') as f:
-            type_names = self._venue_type_names(f)
+            type_names = self._venue_type_names_cache
 
             if type_filter and len(rows):
                 row_types = f['venues/types'][:][rows]
@@ -254,7 +258,7 @@ class _VenueReads:
         if row == IdIndex.MISSING:
             return None
         with h5py.File(self._hdf5_path, 'r') as f:
-            type_names = self._venue_type_names(f)
+            type_names = self._venue_type_names_cache
             type_code  = int(f['venues/types'][row])
             lat        = float(f['venues/latitudes'][row])
             lon        = float(f['venues/longitudes'][row])
@@ -308,7 +312,7 @@ class _VenueReads:
         venues = []
         if len(page_rows):
             with h5py.File(self._hdf5_path, 'r') as f:
-                type_names = self._venue_type_names(f)
+                type_names = self._venue_type_names_cache
                 idx     = sorted(page_rows.tolist())
                 names   = f['metadata/names/venues'][idx]
                 types   = f['venues/types'][idx]
@@ -410,8 +414,9 @@ class _VenueReads:
             return []
         names   = f['metadata/names/subsets'][first:last]
         counts  = f['venues/subsets/member_counts'][first:last]
-        return [{'name': decode_str(n), 'num_members': int(c)}
-                for n, c in zip(names, counts)]
+        decoded_names = pd.Series(names).str.decode('utf-8')
+        return [{'name': name, 'num_members': int(c)}
+                for name, c in zip(decoded_names, counts)]
 
     @staticmethod
     def _venue_properties(f, venue_id: int) -> dict:
@@ -425,10 +430,3 @@ class _VenueReads:
     def _unit_name(self, geo_id: int) -> str | None:
         unit = self._geography.units_by_id.get(geo_id)
         return unit.name if unit else None
-
-    @staticmethod
-    def _venue_type_names(f) -> list[str]:
-        if 'metadata/registries/venue_types' in f:
-            return [decode_str(n)
-                    for n in f['metadata/registries/venue_types'][:]]
-        return []
