@@ -9,6 +9,7 @@ import logging
 
 import h5py
 import numpy as np
+import pandas as pd
 
 from world_reader.geography import AGE_LABELS, AGE_BREAKS, GeographyManager, UnitStats
 
@@ -276,22 +277,20 @@ def _compute_array_stats(data, max_categories: int = 25) -> dict:
             'p75': float(np.percentile(finite, 75)),
         }
     try:
-        values = data.astype(str)
-        unique, counts = np.unique(values, return_counts=True)
-        total = int(len(values))
-        order = np.argsort(-counts)
-        top_u = unique[order[:max_categories]]
-        top_c = counts[order[:max_categories]]
+        counts = pd.Series(data).value_counts()
+        total = int(len(data))
+        top = counts.head(max_categories)
         return {
             'type': 'categorical',
             'count': total,
-            'unique_count': int(len(unique)),
+            'unique_count': int(len(counts)),
             'top_values': {
                 str(k): {'count': int(v), 'pct': round(100.0 * v / total, 2)}
-                for k, v in zip(top_u, top_c)
+                for k, v in top.items()
             },
         }
-    except Exception as exc:
+    except (TypeError, ValueError) as exc:
+        logger.warning("Categorical stats failed for property: %s", exc)
         return {'type': 'unknown', 'error': str(exc)}
 
 
