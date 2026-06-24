@@ -129,10 +129,10 @@ class _PersonReads:
             person_id: Logical person ID.
 
         Returns:
-            `{id, age, sex, activities: [], activity_map: {}, properties,
-            geographical_unit}`, where `geographical_unit` is
-            `{id, name, level, coordinates}` (or None if the person's geo
-            unit is unknown). None if `person_id` is unknown.
+            `{id, age, sex, properties, geographical_unit}`, where
+            `geographical_unit` is `{id, name, level, coordinates}` (or None
+            if the person's geo unit is unknown). None if `person_id` is
+            unknown.
         """
         if self._person_id_to_idx is None:
             return None
@@ -160,7 +160,6 @@ class _PersonReads:
 
         return {
             'id': person_id, 'age': age, 'sex': sex,
-            'activities': [], 'activity_map': {},
             'properties': properties, 'geographical_unit': geo_info,
         }
 
@@ -197,7 +196,6 @@ class _PersonReads:
                 people.append({
                     'id': int(id_val), 'age': int(age_val),
                     'sex': SEX_DECODE.get(int(sex_val), 'unknown'),
-                    'activities': [], 'primary_activity': None,
                 })
 
         return {

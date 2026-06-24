@@ -60,7 +60,7 @@ export async function loadPeople(unitId, page) {
     <table class="people-table">
       <thead>
         <tr>
-          <th>ID</th><th>Age</th><th>Sex</th><th>Activities</th><th></th>
+          <th>ID</th><th>Age</th><th>Sex</th><th></th>
         </tr>
       </thead>
       <tbody id="people-tbody">${renderPeopleRows(data.people)}</tbody>
@@ -76,9 +76,8 @@ export async function loadPeople(unitId, page) {
 
 function renderPeopleRows(people) {
   return people.map(p => {
-    const isExpanded    = state.expandedPersonId === p.id;
-    const activitiesStr = (p.activities || []).join(', ') || '—';
-    const expandRow     = isExpanded ? buildPersonExpandHtml(p) : '';
+    const isExpanded = state.expandedPersonId === p.id;
+    const expandRow   = isExpanded ? buildPersonExpandHtml(p) : '';
 
     return `
       <tr class="data-row${isExpanded ? ' expanded' : ''}"
@@ -86,7 +85,6 @@ function renderPeopleRows(people) {
         <td class="td-id">${p.id}</td>
         <td>${p.age}</td>
         <td>${esc(p.sex)}</td>
-        <td class="td-activities">${esc(activitiesStr)}</td>
         <td class="td-expand">${isExpanded ? '▴' : '▾'}</td>
       </tr>
       ${expandRow}`;
@@ -96,7 +94,7 @@ function renderPeopleRows(people) {
 function buildPersonExpandHtml(person) {
   return `
     <tr class="person-expand-row">
-      <td colspan="5">
+      <td colspan="4">
         <div class="person-expand-content">
           <div><strong>Age</strong>${person.age}</div>
           <div><strong>Sex</strong>${esc(person.sex)}</div>

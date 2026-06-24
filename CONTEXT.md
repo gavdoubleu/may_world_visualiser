@@ -11,7 +11,7 @@ description: Domain glossary for the may_world_visualiser repository
 A geographical unit loaded from the HDF5 world file. GeoUnits form a strict hierarchy via `.parent` / `.children` references. Each GeoUnit has a named level (e.g. `country`, `region`, `area`). Venues may be directly assigned to **any** GeoUnit, leaf or non-leaf (e.g. commercial/leisure venues commonly sit at MGU level above the SGU/household units that hold the resident population). Population is leaf-only: only leaf GeoUnits directly contain People. Every GeoUnit aggregates statistics upward from its own direct assignments plus its descendants.
 
 **Person**
-An individual resident assigned to exactly one GeoUnit. Carries slim attributes: id, age, sex, and a list of activity type strings. Full detail (activity_map) is available via a separate API call.
+An individual resident assigned to exactly one GeoUnit. Carries slim attributes: id, age, sex. Full detail (activity_map, including activities) is available via a separate API call.
 
 **Venue**
 A location assigned to a GeoUnit, of a named VenueType. Contains zero or more Subsets. A Venue whose `parent_id == -1` and that has at least one ChildVenue is a **ParentVenue**; it appears at the top level of the venue list and shows a child count and amalgamated member total. A Venue whose `parent_id != -1` is a **ChildVenue**; it never appears at the top level and is accessible only by expanding its ParentVenue. The hierarchy is two levels deep: ChildVenues do not themselves have children.
@@ -20,7 +20,7 @@ A location assigned to a GeoUnit, of a named VenueType. Contains zero or more Su
 A named membership group within a Venue (e.g. a household within a building). In the Venue list, only a member count is shown. Full member detail (id, age, sex, geo_unit) is loaded on demand when a Venue is opened in the Detail Panel.
 
 **ActivityMap**
-The full set of activities for a single Person, loaded on demand in the Detail Panel. Each entry records the activity type, the Venue where it takes place, the Subset within that Venue, and the Venue's GeoUnit. The slim Person object carries only a list of activity type strings; the ActivityMap is the on-demand expansion.
+The full set of activities for a single Person, loaded on demand in the Detail Panel. Each entry records the activity type, the Venue where it takes place, the Subset within that Venue, and the Venue's GeoUnit. The slim Person object carries no activity data at all; the ActivityMap is the sole source of a Person's activities, loaded on demand.
 
 **VenueType**
 A string label classifying Venues (e.g. `household`, `school`, `workplace`). The set of types is world-specific and read from the HDF5 registry.
