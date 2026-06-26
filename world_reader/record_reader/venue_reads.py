@@ -244,6 +244,18 @@ class _VenueReads:
                 })
         return venues
 
+    def get_venue_geo_unit_and_type(self, venue_id: int) -> tuple[int, str] | None:
+        """Return (geo_unit_id, venue_type_name) for a venue, or None if unknown."""
+        row = int(self._venue_id_to_idx[venue_id])
+        if row == IdIndex.MISSING:
+            return None
+        with h5py.File(self._hdf5_path, 'r') as f:
+            type_names = self._venue_type_names_cache
+            type_code  = int(f['venues/types'][row])
+            geo_id     = int(f['venues/geo_unit_ids'][row])
+        venue_type = type_names[type_code] if type_code < len(type_names) else 'unknown'
+        return (geo_id, venue_type)
+
     def load_venue_detail(self, venue_id: int) -> dict | None:
         """Full detail for one Venue, plus its Subsets (member counts only).
 

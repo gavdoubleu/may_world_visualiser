@@ -32,6 +32,9 @@ Examples:
     parser.add_argument('--theme', type=str, default=None,
                         help='Built-in theme name, e.g. dark_scientific, clean_minimal '
                              '(default: dark_scientific)')
+    parser.add_argument('--calendar-events', type=str, default=None,
+                        help='Path to calendar_events_named.csv (optional; '
+                             'enables Calendar Events section in venue detail panel)')
 
     args = parser.parse_args()
 
@@ -50,7 +53,9 @@ Examples:
         print(f'\nERROR: failed to load world: {exc}\n')
         sys.exit(1)
 
-    app = create_app(world, world_path, theme=args.theme)
+    calendar_events_path = Path(args.calendar_events) if args.calendar_events else None
+    app = create_app(world, world_path, theme=args.theme,
+                     calendar_events_path=calendar_events_path)
 
     print(f'\n{"=" * 50}')
     print('  WorldExplorer')

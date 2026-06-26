@@ -16,22 +16,25 @@ _BUILTIN_THEMES_DIR = Path(__file__).parent.parent / 'world_map' / 'yaml' / 'the
 _DEFAULT_THEME = 'dark_scientific'
 
 
-def create_app(world, hdf5_path, theme=None):
+def create_app(world, hdf5_path, theme=None, calendar_events_path=None):
     """Build the WorldExplorer Flask app.
 
     theme: built-in theme name (e.g. 'dark_scientific', 'clean_minimal');
         defaults to _DEFAULT_THEME, mirroring world_map's config-driven theme.
     """
     from webapp_utilities import make_app, resolve_theme
-    from world_reader import RecordReader
+    from world_reader import RecordReader, CalendarEventReader
     from world_explorer.context import ExplorerContext, _EXPLORER_CTX_KEY
     from world_explorer.routes.explorer import explorer_bp
 
     record_reader = RecordReader(hdf5_path, world)
     active_theme_name = theme or _DEFAULT_THEME
     theme_dict = resolve_theme(active_theme_name, _BUILTIN_THEMES_DIR)
+    calendar_event_reader = (CalendarEventReader(calendar_events_path)
+                             if calendar_events_path is not None else None)
     context = ExplorerContext(world=world, record_reader=record_reader, theme=theme_dict,
-                              active_theme_name=active_theme_name)
+                              active_theme_name=active_theme_name,
+                              calendar_event_reader=calendar_event_reader)
 
     app = make_app(
         __name__,

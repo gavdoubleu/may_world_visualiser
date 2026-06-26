@@ -19,6 +19,9 @@ A location assigned to a GeoUnit, of a named VenueType. Contains zero or more Su
 **Subset**
 A named membership group within a Venue (e.g. a household within a building). In the Venue list, only a member count is shown. Full member detail (id, age, sex, geo_unit) is loaded on demand when a Venue is opened in the Detail Panel.
 
+**CalendarEvent**
+A scheduled occurrence at a Venue, read from an external CSV (`calendar_events_named.csv`). Each row carries an `event_name`, `date`, and `duration_days`, and is keyed by `(hosting_geo_unit_id, venue_type_name)` — not by a direct venue ID. CalendarEvents are optional (require an explicit `--calendar-events` flag at launch); if absent, no Calendar Events section appears in the Detail Panel. The design is general: any `venue_type_name` value can appear in the CSV; currently only `fair` rows are loaded.
+
 **ActivityMap**
 The full set of activities for a single Person, loaded on demand in the Detail Panel. Each entry records the activity type, the Venue where it takes place, the Subset within that Venue, and the Venue's GeoUnit. The slim Person object carries no activity data at all; the ActivityMap is the sole source of a Person's activities, loaded on demand.
 

@@ -22,6 +22,7 @@ export async function openVenueDetailsPanel(venueId, venueName, { pushHistory = 
 
   document.getElementById('detail-panel-title').textContent = detail.name || venueName;
   content.innerHTML = buildVenueDetailHtml(detail);
+  loadVenueCalendarEvents(venueId, content);
   loadVenueDetailMembers(venueId, content);
   content.addEventListener('click', handlePanelClick);
 }
@@ -72,12 +73,56 @@ function buildVenueDetailHtml(venue) {
     html += '</div>';
   }
 
+  html += `<div id="venue-calendar-events-section"></div>`;
+
   html += `<div class="detail-section-title">Members</div>
     <div id="venue-members-section">
       <div style="color:var(--theme-text-muted);font-size:0.82rem">Loading from file…</div>
     </div>`;
 
   return html;
+}
+
+async function loadVenueCalendarEvents(venueId, container) {
+  const section = container.querySelector('#venue-calendar-events-section');
+  if (!section) return;
+
+  let events;
+  try {
+    events = await fetchJson(`/api/explorer/venue/${venueId}/calendar-events`);
+  } catch {
+    return;
+  }
+
+  if (!events || events.length === 0) return;
+
+  section.innerHTML = buildCalendarEventsHtml(events);
+}
+
+function buildCalendarEventsHtml(events) {
+  const rows = events.map(ev => `
+    <div class="member-row">
+      <span style="flex:2">${esc(ev.event_name)}</span>
+      <span style="flex:1">${esc(ev.date)}</span>
+      <span style="flex:1">${esc(String(ev.duration_days))} days</span>
+    </div>`).join('');
+
+  return `
+    <div class="detail-section-title">Calendar Events</div>
+    <details class="subset-group" open>
+      <summary class="subset-group__title">
+        Events
+        <span class="subset-count">${events.length}</span>
+      </summary>
+      <div class="member-list">
+        <div class="member-list__header">
+          <span style="flex:2">Name</span>
+          <span style="flex:1">Date</span>
+          <span style="flex:1">Duration</span>
+        </div>
+        ${rows}
+      </div>
+    </details>`;
 }
 
 async function loadVenueDetailMembers(venueId, container) {

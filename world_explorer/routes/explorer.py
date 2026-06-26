@@ -199,6 +199,18 @@ def get_venue_detail(venue_id):
     return jsonify(venue)
 
 
+@explorer_bp.route('/api/explorer/venue/<int:venue_id>/calendar-events')
+def get_venue_calendar_events(venue_id):
+    ctx = get_explorer_context()
+    if ctx.calendar_event_reader is None:
+        return jsonify([])
+    location = ctx.record_reader.get_venue_geo_unit_and_type(venue_id)
+    if location is None:
+        return jsonify([])
+    geo_unit_id, venue_type = location
+    return jsonify(ctx.calendar_event_reader.events_for_venue(geo_unit_id, venue_type))
+
+
 @explorer_bp.route('/api/explorer/venue/<int:venue_id>/locate')
 def locate_venue(venue_id):
     per_page = min(request.args.get('per_page', 20, type=int), 200)
