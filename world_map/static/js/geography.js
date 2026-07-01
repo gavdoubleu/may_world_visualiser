@@ -135,5 +135,5 @@ if (typeof module !== 'undefined') {
 if (typeof window !== 'undefined') {
     window.WorldMap = window.WorldMap || {};
     Object.assign(window.WorldMap, { calculateMarkerRadius, getPopulationColor, createGeoUnitPopup,
-        setupGeoUnitZoomListener });
+        setupGeoUnitZoomListener, _getZoomScaleFactor });
 }
