@@ -332,6 +332,25 @@ def _compute_array_stats(data, max_categories: int = 25) -> dict:
         return {'type': 'unknown', 'error': str(exc)}
 
 
+def _categorical_stats_from_counts(
+    counts_by_label: dict, total: int, max_categories: int = 25
+) -> dict:
+    """Same `type: 'categorical'` shape as `_compute_array_stats`, built
+    directly from pre-counted labels — skips `pd.Series(...).value_counts()`
+    over the raw array for callers that already have bincount-style counts.
+    """
+    top = sorted(counts_by_label.items(), key=lambda kv: kv[1], reverse=True)[:max_categories]
+    return {
+        'type': 'categorical',
+        'count': total,
+        'unique_count': len(counts_by_label),
+        'top_values': {
+            str(k): {'count': int(v), 'pct': round(100.0 * v / total, 2)}
+            for k, v in top
+        },
+    }
+
+
 def compute_slim_statistics(f: h5py.File, compute_activity_stats: bool = False) -> dict:
     """Compute world-level summary statistics from an open HDF5 file.
 
@@ -358,11 +377,22 @@ def compute_slim_statistics(f: h5py.File, compute_activity_stats: bool = False) 
             person_stats['age'] = _compute_array_stats(pop['ages'][:])
         if 'sexes' in pop:
             sex_raw = pop['sexes'][:]
+            total   = len(sex_raw)
             if sex_raw.dtype.kind in ('u', 'i'):
-                sexes = _SEX_LABELS[np.clip(sex_raw.astype(np.int64), 0, 2)]
+                # Bounded integer codes — bincount directly, matching
+                # compute_population_statistics, rather than materialising a
+                # full label-string array just to re-count it via pandas.
+                sex_codes  = np.clip(sex_raw.astype(np.int64), 0, 2)
+                sex_counts = np.bincount(sex_codes, minlength=3)
+                counts_by_label = {
+                    label: int(sex_counts[code])
+                    for code, label in enumerate(_SEX_LABELS)
+                    if sex_counts[code] > 0
+                }
             else:
-                sexes = sex_raw.astype(str)
-            person_stats['sex'] = _compute_array_stats(sexes)
+                sex_unique, sex_counts = np.unique(sex_raw.astype(str), return_counts=True)
+                counts_by_label = {str(k): int(v) for k, v in zip(sex_unique, sex_counts)}
+            person_stats['sex'] = _categorical_stats_from_counts(counts_by_label, total)
         if 'properties' in pop:
             for prop_name in pop['properties'].keys():
                 try:
