@@ -371,7 +371,7 @@ function renderPanelView(view) {
     switch (view.type) {
         case 'unit':   return showUnitDetails(view.unitName, { fromNav: true });
         case 'venues': return WorldMap.showUnitVenues(view.unitName, { fromNav: true });
-        case 'people': return WorldMap.showUnitPeople(view.unitName, view.page, { fromNav: true });
+        case 'people': return WorldMap.showUnitPeople(view.unitName, { fromNav: true });
         case 'person': return WorldMap.showPersonDetails(view.personId, { fromNav: true });
         case 'venue':  return WorldMap.showVenueDetails(view.venueId, { fromNav: true });
         default:

@@ -8,16 +8,17 @@ const peopleState = {
     totalPages: 0
 };
 
-async function showUnitPeople(unitName, page = 1, opts = {}) {
+async function showUnitPeople(unitName, opts = {}) {
+    if (!opts.fromNav) WorldMap.panelNavigator.push({ type: 'people', unitName });
+    peopleState.currentUnit = unitName;
+    peopleState.currentPage = 1;
+    await renderUnitPeople();
+}
+
+async function renderUnitPeople() {
     try {
-        if (typeof page !== 'number') {
-            const clamped = WorldMap.clampPageNumber(page, peopleState.totalPages || 1);
-            if (clamped === null) return;
-            page = clamped;
-        }
-        if (!opts.fromNav) WorldMap.panelNavigator.push({ type: 'people', unitName, page });
-        peopleState.currentUnit = unitName;
-        peopleState.currentPage = page;
+        const unitName = peopleState.currentUnit;
+        const page = peopleState.currentPage;
 
         const response = await fetch(
             `/api/geography/unit/${encodeURIComponent(unitName)}/people?page=${page}&per_page=${peopleState.perPage}`
@@ -80,7 +81,7 @@ async function showUnitPeople(unitName, page = 1, opts = {}) {
         `;
 
         if (data.total_pages > 1) {
-            html += WorldMap.buildPaginationHtml(page, data.total_pages, `WorldMap.showUnitPeople('${unitName}', __PAGE__)`);
+            html += WorldMap.buildPaginationHtml(page, data.total_pages, 'WorldMap.changePeoplePage(__PAGE__)');
         }
 
         content.innerHTML = html;
@@ -89,6 +90,13 @@ async function showUnitPeople(unitName, page = 1, opts = {}) {
     } catch (error) {
         console.error('Error loading people list:', error);
     }
+}
+
+function changePeoplePage(page) {
+    const clamped = WorldMap.clampPageNumber(page, peopleState.totalPages || 1);
+    if (clamped === null) return;
+    peopleState.currentPage = clamped;
+    renderUnitPeople();
 }
 
 async function showPersonDetails(personId, opts = {}) {
@@ -216,5 +224,5 @@ function formatActivityType(activityType) {
 
 if (typeof window !== 'undefined') {
     window.WorldMap = window.WorldMap || {};
-    Object.assign(window.WorldMap, { showUnitPeople, showPersonDetails });
+    Object.assign(window.WorldMap, { showUnitPeople, changePeoplePage, showPersonDetails });
 }
