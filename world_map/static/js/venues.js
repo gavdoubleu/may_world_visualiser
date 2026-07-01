@@ -4,6 +4,7 @@ const venuesState = {
     currentUnit: null,
     expandedType: null,
     expandedPage: 1,
+    expandedTotalPages: 1,
     perPage: 20,
 };
 
@@ -71,6 +72,7 @@ async function renderExpandedVenueType(unitName, type) {
         `/api/geography/unit/${encodeURIComponent(unitName)}/venues?type=${encodeURIComponent(type)}&page=${page}&per_page=${venuesState.perPage}`
     );
     const data = await response.json();
+    venuesState.expandedTotalPages = data.total_pages;
 
     let html = '<div class="venue-list">';
 
@@ -86,17 +88,7 @@ async function renderExpandedVenueType(unitName, type) {
     html += '</div>';
 
     if (data.total_pages > 1) {
-        html += `
-            <div class="pagination">
-                <button class="pagination-btn" ${page <= 1 ? 'disabled' : ''} onclick="WorldMap.changeVenueTypePage(${page - 1})">
-                    &larr; Prev
-                </button>
-                <span class="pagination-info">Page ${page} of ${data.total_pages}</span>
-                <button class="pagination-btn" ${page >= data.total_pages ? 'disabled' : ''} onclick="WorldMap.changeVenueTypePage(${page + 1})">
-                    Next &rarr;
-                </button>
-            </div>
-        `;
+        html += WorldMap.buildPaginationHtml(page, data.total_pages, 'WorldMap.changeVenueTypePage(__PAGE__)');
     }
 
     return html;
@@ -109,7 +101,9 @@ function toggleVenueTypeGroup(type) {
 }
 
 function changeVenueTypePage(page) {
-    venuesState.expandedPage = page;
+    const clamped = WorldMap.clampPageNumber(page, venuesState.expandedTotalPages);
+    if (clamped === null) return;
+    venuesState.expandedPage = clamped;
     renderUnitVenues();
 }
 

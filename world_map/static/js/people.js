@@ -10,6 +10,11 @@ const peopleState = {
 
 async function showUnitPeople(unitName, page = 1, opts = {}) {
     try {
+        if (typeof page !== 'number') {
+            const clamped = WorldMap.clampPageNumber(page, peopleState.totalPages || 1);
+            if (clamped === null) return;
+            page = clamped;
+        }
         if (!opts.fromNav) WorldMap.panelNavigator.push({ type: 'people', unitName, page });
         peopleState.currentUnit = unitName;
         peopleState.currentPage = page;
@@ -75,17 +80,7 @@ async function showUnitPeople(unitName, page = 1, opts = {}) {
         `;
 
         if (data.total_pages > 1) {
-            html += `
-                <div class="pagination">
-                    <button class="pagination-btn" ${page <= 1 ? 'disabled' : ''} onclick="WorldMap.showUnitPeople('${unitName}', ${page - 1})">
-                        &larr; Prev
-                    </button>
-                    <span class="pagination-info">Page ${page} of ${data.total_pages}</span>
-                    <button class="pagination-btn" ${page >= data.total_pages ? 'disabled' : ''} onclick="WorldMap.showUnitPeople('${unitName}', ${page + 1})">
-                        Next &rarr;
-                    </button>
-                </div>
-            `;
+            html += WorldMap.buildPaginationHtml(page, data.total_pages, `WorldMap.showUnitPeople('${unitName}', __PAGE__)`);
         }
 
         content.innerHTML = html;

@@ -4,9 +4,11 @@ const venueDetailState = {
     venueId: null,
     expandedSubset: null,
     page: 1,
+    pageTotalPages: 1,
     perPage: 20,
     childrenExpanded: false,
     childrenPage: 1,
+    childrenTotalPages: 1,
 };
 
 async function showVenueDetails(venueId, opts = {}) {
@@ -155,17 +157,8 @@ function renderExpandedSubsetMembers(subset) {
     html += '</div>';
 
     if (subset.total_pages > 1) {
-        html += `
-            <div class="pagination">
-                <button class="pagination-btn" ${subset.page <= 1 ? 'disabled' : ''} onclick="WorldMap.changeVenueMembersPage(${subset.page - 1})">
-                    &larr; Prev
-                </button>
-                <span class="pagination-info">Page ${subset.page} of ${subset.total_pages}</span>
-                <button class="pagination-btn" ${subset.page >= subset.total_pages ? 'disabled' : ''} onclick="WorldMap.changeVenueMembersPage(${subset.page + 1})">
-                    Next &rarr;
-                </button>
-            </div>
-        `;
+        venueDetailState.pageTotalPages = subset.total_pages;
+        html += WorldMap.buildPaginationHtml(subset.page, subset.total_pages, 'WorldMap.changeVenueMembersPage(__PAGE__)');
     }
 
     return html;
@@ -179,7 +172,9 @@ function toggleVenueSubsetGroup(subsetName) {
 }
 
 function changeVenueMembersPage(page) {
-    venueDetailState.page = page;
+    const clamped = WorldMap.clampPageNumber(page, venueDetailState.pageTotalPages || 1);
+    if (clamped === null) return;
+    venueDetailState.page = clamped;
     renderVenueMembers();
 }
 
@@ -210,17 +205,8 @@ async function renderVenueChildren() {
     html += '</div>';
 
     if (data.total_pages > 1) {
-        html += `
-            <div class="pagination">
-                <button class="pagination-btn" ${page <= 1 ? 'disabled' : ''} onclick="WorldMap.changeVenueChildrenPage(${page - 1})">
-                    &larr; Prev
-                </button>
-                <span class="pagination-info">Page ${page} of ${data.total_pages}</span>
-                <button class="pagination-btn" ${page >= data.total_pages ? 'disabled' : ''} onclick="WorldMap.changeVenueChildrenPage(${page + 1})">
-                    Next &rarr;
-                </button>
-            </div>
-        `;
+        venueDetailState.childrenTotalPages = data.total_pages;
+        html += WorldMap.buildPaginationHtml(page, data.total_pages, 'WorldMap.changeVenueChildrenPage(__PAGE__)');
     }
 
     section.innerHTML = html;
@@ -233,7 +219,9 @@ function toggleVenueChildren() {
 }
 
 function changeVenueChildrenPage(page) {
-    venueDetailState.childrenPage = page;
+    const clamped = WorldMap.clampPageNumber(page, venueDetailState.childrenTotalPages || 1);
+    if (clamped === null) return;
+    venueDetailState.childrenPage = clamped;
     renderVenueChildren();
 }
 
