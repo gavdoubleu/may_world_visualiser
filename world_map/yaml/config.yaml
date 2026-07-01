@@ -21,18 +21,42 @@ theme: dark_scientific
 # type options: 'web_mercator' (default), 'utm'
 #
 # UTM requires a custom image background (OSM tiles are Web Mercator only).
-# When using UTM with a background image, supply --map-bounds in WGS84 degrees
-# corresponding to the image NW and SE pixel corners. Use pyproj to convert:
+# When using UTM with a background image, supply map.bounds (below) in WGS84
+# degrees corresponding to the image NW and SE pixel corners. Use pyproj to
+# convert:
 #   from pyproj import Transformer
 #   t = Transformer.from_crs("EPSG:<zone_epsg>", "EPSG:4326", always_xy=True)
 #   lon_nw, lat_nw = t.transform(utm_x_min, utm_y_max)
 #   lon_se, lat_se = t.transform(utm_x_max, utm_y_min)
-#   # --map-bounds "lat_nw,lon_se,lat_se,lon_nw"  (north,east,south,west)
+#   # map.bounds: "lat_nw,lon_se,lat_se,lon_nw"  (north,east,south,west)
 
 projection:
   type: web_mercator
   # type: utm
   # zone: 30
+
+# =============================================================================
+# TITLE  (optional)
+# =============================================================================
+# Overrides the theme's own title. Falls back to the theme's title, then a
+# hardcoded default, if omitted.
+
+# title: "My World Map"
+
+# =============================================================================
+# MAP BACKGROUND
+# =============================================================================
+# background: 'osm' (OpenStreetMap, default) or 'image' (custom image).
+# image/bounds/attribution are only used when background: image.
+# image may be a local path (relative to this file's directory) or a URL.
+# bounds format: "north,east,south,west" (WGS84 degrees).
+
+map:
+  background: osm
+  # background: image
+  # image: my_map.png
+  # bounds: "55,2,50,-5"
+  # attribution: "Custom Map Image"
 
 # =============================================================================
 # GEO UNIT NAMES  (optional)
