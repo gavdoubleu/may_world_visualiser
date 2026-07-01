@@ -19,7 +19,8 @@ const state = {
     mapConfig: null,
     panelConfig: null,
     geoUnitNameToId: {},
-    baseZoom: 6
+    baseZoom: 6,
+    hasFitInitialGeographyBounds: false
 };
 
 // =============================================================================
@@ -300,7 +301,14 @@ async function loadGeographyLevel(level) {
             }
         });
 
-        state.map.fitBounds(state.layers.geography.getBounds());
+        // Only frame the map to the geography once, on initial load — refitting
+        // on every level switch snaps to a tight zoom when a level has few
+        // (or one) units, since a degenerate/small bounding box has no real
+        // extent to fit.
+        if (!state.hasFitInitialGeographyBounds) {
+            state.map.fitBounds(state.layers.geography.getBounds());
+            state.hasFitInitialGeographyBounds = true;
+        }
 
     } catch (error) {
         console.error('Error loading geography level:', error);
