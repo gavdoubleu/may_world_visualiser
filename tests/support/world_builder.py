@@ -62,7 +62,7 @@ class WorldBuilder:
         self,
         name: str,
         level: str = 'region',
-        coordinates: tuple[float, float] = (51.5, -0.1),
+        coordinates: tuple[float, float] | None = (51.5, -0.1),
         population: int = 0,
         parent: str | None = None,
     ) -> 'WorldBuilder':
@@ -116,8 +116,12 @@ class WorldBuilder:
         level_codes = np.array([self._levels.index(unit['level']) for unit in self._units],
                                dtype=np.int32)
         names       = np.array([unit['name'].encode() for unit in self._units], dtype=dt)
-        latitudes   = np.array([unit['coordinates'][0] for unit in self._units], dtype=np.float64)
-        longitudes  = np.array([unit['coordinates'][1] for unit in self._units], dtype=np.float64)
+        latitudes   = np.array(
+            [unit['coordinates'][0] if unit['coordinates'] else np.nan for unit in self._units],
+            dtype=np.float64)
+        longitudes  = np.array(
+            [unit['coordinates'][1] if unit['coordinates'] else np.nan for unit in self._units],
+            dtype=np.float64)
         level_names = np.array([level.encode() for level in self._levels], dtype=dt)
 
         person_ids: list[int] = []

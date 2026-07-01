@@ -56,6 +56,10 @@ def create_app(world, hdf5_path, map_config=None, config_path=None):
         config_path = _DEFAULT_CONFIG_PATH
     cfg = AppConfig.load(Path(config_path))
 
+    if world.geography and cfg.geo_unit_coordinates.get('enabled', True):
+        from world_reader.geography import infer_missing_coordinates
+        infer_missing_coordinates(world.geography)
+
     # Build map projection from config
     from world_map.projection import build as _build_projection, MapProjectionConfig
     try:

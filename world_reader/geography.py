@@ -180,6 +180,45 @@ class GeographyManager:
         }
 
 
+def infer_missing_coordinates(geography: 'GeographyManager') -> int:
+    """Fill in GeoUnit.coordinates for units missing them, as the arithmetic
+    mean of each unit's children's coordinates (resolved bottom-up, so a
+    parent can use children whose own coordinates were just inferred).
+
+    Args:
+        geography: The GeographyManager to mutate in place.
+
+    Returns:
+        Count of units whose coordinates were newly inferred.
+    """
+    inferred_count = 0
+
+    def resolve(unit: GeoUnit) -> tuple[float, float] | None:
+        nonlocal inferred_count
+        if unit.coordinates is not None:
+            return unit.coordinates
+
+        child_coordinates = [
+            coordinates for child in unit.children
+            if (coordinates := resolve(child)) is not None
+        ]
+        if not child_coordinates:
+            return None
+
+        mean_lat = sum(lat for lat, _ in child_coordinates) / len(child_coordinates)
+        mean_lon = sum(lon for _, lon in child_coordinates) / len(child_coordinates)
+        unit.coordinates = (mean_lat, mean_lon)
+        inferred_count += 1
+        return unit.coordinates
+
+    for unit in geography.units_by_id.values():
+        if unit.parent is None:
+            resolve(unit)
+
+    logger.info(f"Inferred coordinates for {inferred_count} geo units missing them")
+    return inferred_count
+
+
 def load_geography(
     geo_group: h5py.Group,
     geo_names: np.ndarray | None = None,

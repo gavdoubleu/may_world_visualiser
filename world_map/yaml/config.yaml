@@ -71,6 +71,18 @@ geo_unit_names:
   name_column: Name
 
 # =============================================================================
+# GEO UNIT COORDINATES  (optional)
+# =============================================================================
+# When a geo unit has no latitude/longitude in the world file (common for
+# high-level units, e.g. a whole world's top-level region), fall back to the
+# arithmetic mean of its children's coordinates so a marker and info panel
+# can still appear. Set enabled: false to leave such units marker-less
+# instead.
+
+geo_unit_coordinates:
+  enabled: true
+
+# =============================================================================
 # INFO PANEL
 # =============================================================================
 # Controls what appears in the side panel when clicking a geo unit or venue.

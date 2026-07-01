@@ -28,6 +28,25 @@ def test_panel_config_route(client_for):
     assert resp.get_json()['geo_unit_panel']['title_field'] == 'name'
 
 
+def test_geo_unit_coordinates_defaults_to_enabled_when_block_omitted(tmp_path):
+    config_path = tmp_path / 'config.yaml'
+    config_path.write_text(
+        'theme: dark_scientific\npanel:\n  title: test\nevents:\n  time: {}\n'
+    )
+    cfg = AppConfig.load(config_path)
+    assert cfg.geo_unit_coordinates == {'enabled': True}
+
+
+def test_geo_unit_coordinates_can_be_disabled(tmp_path):
+    config_path = tmp_path / 'config.yaml'
+    config_path.write_text(
+        'theme: dark_scientific\npanel:\n  title: test\nevents:\n  time: {}\n'
+        'geo_unit_coordinates:\n  enabled: false\n'
+    )
+    cfg = AppConfig.load(config_path)
+    assert cfg.geo_unit_coordinates == {'enabled': False}
+
+
 def test_load_raises_for_missing_theme(tmp_path):
     config_path = tmp_path / 'config.yaml'
     config_path.write_text(

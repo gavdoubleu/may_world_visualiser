@@ -22,6 +22,7 @@ class AppConfig:
     theme: dict
     events: dict
     geo_unit_names: dict[str, str] | None
+    geo_unit_coordinates: dict
     projection_type: str
     projection_kwargs: dict
     map: dict
@@ -46,6 +47,7 @@ class AppConfig:
         logger.info(f"Loaded theme '{theme_ref}'")
 
         geo_unit_names = _load_geo_unit_names(cfg.get('geo_unit_names', {}), config_path.parent)
+        geo_unit_coordinates = cfg.get('geo_unit_coordinates', {'enabled': True})
 
         proj_cfg = cfg.get('projection', {})
         projection_type = proj_cfg.get('type', 'web_mercator')
@@ -59,6 +61,7 @@ class AppConfig:
             theme=theme,
             events=events,
             geo_unit_names=geo_unit_names,
+            geo_unit_coordinates=geo_unit_coordinates,
             projection_type=projection_type,
             projection_kwargs=projection_kwargs,
             map=map_settings,
@@ -73,6 +76,7 @@ class AppConfig:
             theme={},
             events={},
             geo_unit_names=None,
+            geo_unit_coordinates={'enabled': True},
             projection_type='web_mercator',
             projection_kwargs={},
             map={'background': 'osm', 'image': None, 'bounds': None, 'attribution': None},
