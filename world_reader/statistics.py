@@ -46,10 +46,14 @@ def compute_unit_statistics(
 
     sex_raw = pop['sexes'][:]
     if sex_raw.dtype.kind in ('u', 'i'):
-        _sex_labels = np.array(['male', 'female', 'unknown'])
-        sexes = _sex_labels[np.clip(sex_raw.astype(np.int64), 0, 2)]
+        # Already integer-coded — use the codes directly rather than
+        # materialising a full string array just to re-discover them below.
+        sex_labels_all = np.array(['male', 'female', 'unknown'])
+        sex_codes_all  = np.clip(sex_raw.astype(np.int64), 0, 2)
     else:
-        sexes = sex_raw.astype(str)
+        sex_codes_all, sex_labels_all = pd.factorize(sex_raw.astype(str))
+        sex_labels_all = np.asarray(sex_labels_all)
+    num_sex_labels = len(sex_labels_all)
 
     AGE_BREAKS_NP = AGE_BREAKS[:-1] + [np.inf]
 
@@ -59,11 +63,31 @@ def compute_unit_statistics(
     sort_idx = np.argsort(person_geo_ids, kind='stable')
     sg = person_geo_ids[sort_idx]
     sa = ages[sort_idx]
-    ss = sexes[sort_idx]
 
     bounds   = np.where(np.diff(sg) != 0)[0] + 1
     g_starts = np.concatenate([[0], bounds])
     g_ends   = np.concatenate([bounds, [len(sg)]])
+
+    # Per-unit sex-distribution counts, all groups at once — group boundaries
+    # are already known from the geo-id sort above, so a single bincount over
+    # (group_index, sex_code) replaces one np.unique call per geo unit with
+    # no sorting at all (cheaper than a lexsort+diff groupby for this few-
+    # category case).
+    sc             = sex_codes_all[sort_idx]
+    group_idx      = np.repeat(np.arange(len(g_starts)), g_ends - g_starts)
+    sex_counts     = np.bincount(
+        group_idx.astype(np.int64) * num_sex_labels + sc,
+        minlength=len(g_starts) * num_sex_labels,
+    ).reshape(len(g_starts), num_sex_labels)
+
+    sex_distribution_by_unit: dict[int, dict] = {}
+    for k in range(len(g_starts)):
+        unit_id = int(sg[g_starts[k]])
+        nz = np.nonzero(sex_counts[k])[0]
+        if len(nz):
+            sex_distribution_by_unit[unit_id] = {
+                str(sex_labels_all[j]): int(sex_counts[k, j]) for j in nz
+            }
 
     direct_stats: dict = {}
     for i, geo_id in enumerate(sg[g_starts]):
@@ -77,11 +101,10 @@ def compute_unit_statistics(
             lo, hi = AGE_BREAKS_NP[j], AGE_BREAKS_NP[j + 1]
             age_dist[label] = int(np.sum((sa[s:e] >= lo) & (sa[s:e] < hi)))
 
-        sex_u, sex_c = np.unique(ss[s:e], return_counts=True)
         direct_stats[unit_id] = {
             'population':       int(e - s),
             'age_distribution': age_dist,
-            'sex_distribution': {str(k): int(v) for k, v in zip(sex_u, sex_c)},
+            'sex_distribution': sex_distribution_by_unit.get(unit_id, {}),
             'venue_types':      {},
             'activity_counts':  {},
         }
@@ -108,27 +131,42 @@ def compute_unit_statistics(
         except Exception:
             pass
 
-        if type_reg is not None and types_raw.dtype.kind in ('u', 'i') and len(types_raw):
-            v_types = type_reg[types_raw.astype(int)]
-        elif len(types_raw):
-            v_types = types_raw.astype(str)
+        # Already integer-coded when a registry is present — use the codes
+        # directly rather than materialising a full string array just to
+        # re-discover them below.
+        if len(types_raw) == 0:
+            type_codes_all, type_labels_all = np.array([], dtype=np.int64), np.array([])
+        elif type_reg is not None and types_raw.dtype.kind in ('u', 'i'):
+            type_codes_all, type_labels_all = types_raw.astype(np.int64), type_reg
         else:
-            v_types = np.array([])
+            type_codes_all, type_labels_all = pd.factorize(types_raw.astype(str))
+            type_labels_all = np.asarray(type_labels_all)
 
-        if len(v_types):
+        if len(type_codes_all):
             v_sort    = np.argsort(v_geo_ids, kind='stable')
             svg       = v_geo_ids[v_sort]
-            svt       = v_types[v_sort]
+
             vb        = np.where(np.diff(svg) != 0)[0] + 1
             vs_starts = np.concatenate([[0], vb])
             vs_ends   = np.concatenate([vb, [len(svg)]])
 
-            for i, geo_id in enumerate(svg[vs_starts]):
-                unit_id = int(geo_id)
+            # Per-unit venue-type counts, all groups at once — same
+            # sort-free bincount approach as sex_distribution above.
+            num_type_labels = len(type_labels_all)
+            tc              = type_codes_all[v_sort]
+            v_group_idx     = np.repeat(np.arange(len(vs_starts)), vs_ends - vs_starts)
+            type_counts     = np.bincount(
+                v_group_idx.astype(np.int64) * num_type_labels + tc,
+                minlength=len(vs_starts) * num_type_labels,
+            ).reshape(len(vs_starts), num_type_labels)
+
+            for k in range(len(vs_starts)):
+                unit_id = int(svg[vs_starts[k]])
                 if unit_id not in geography.units_by_id:
                     continue
-                s, e = int(vs_starts[i]), int(vs_ends[i])
-                t_u, t_c = np.unique(svt[s:e], return_counts=True)
+                nz = np.nonzero(type_counts[k])[0]
+                if not len(nz):
+                    continue
                 # Venues attach to any GeoUnit (leaf or not), independent of
                 # resident population — seed an entry for venue-only units
                 # rather than dropping their counts (they'd otherwise never
@@ -140,7 +178,7 @@ def compute_unit_statistics(
                     'venue_types':      {},
                     'activity_counts':  {},
                 })['venue_types'] = {
-                    str(k): int(cnt) for k, cnt in zip(t_u, t_c)
+                    str(type_labels_all[j]): int(type_counts[k, j]) for j in nz
                 }
 
     # ── activity counts per leaf unit ────────────────────────────────────────
