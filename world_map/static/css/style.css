@@ -645,24 +645,6 @@ header h1 {
 .page-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .page-input:focus { outline: none; border-color: var(--theme-accent); }
 
-/* Person Details */
-.activities-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 10px 0;
-}
-
-.activity-tag {
-    display: inline-block;
-    padding: 5px 12px;
-    background: var(--theme-accent);
-    color: var(--theme-bg);
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
 /* Activity Map */
 .activity-map-section {
     margin-bottom: 15px;

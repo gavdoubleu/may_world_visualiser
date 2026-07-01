@@ -145,17 +145,6 @@ async function showPersonDetails(personId, opts = {}) {
             `;
         }
 
-        if (person.activities && person.activities.length > 0) {
-            html += `
-                <h3>Activities</h3>
-                <div class="activities-list">
-                    ${person.activities.map(activity => `
-                        <span class="activity-tag">${activity}</span>
-                    `).join('')}
-                </div>
-            `;
-        }
-
         if (person.activity_map && Object.keys(person.activity_map).length > 0) {
             html += `<h3>Activity Map</h3>`;
 
