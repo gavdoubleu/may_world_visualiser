@@ -197,33 +197,10 @@ panel:
       fill_opacity: 0.7
       zoom_scaling:
         enabled: true
-        base_zoom: 1
+        # base_zoom omitted: geography.js falls back to map.getZoom() straight
+        # after fitBounds, so it auto-tracks whatever zoom the image/bounds
+        # resolve to instead of a hardcoded number that can drift.
         scale_exponent: 0.7
-        min_scale: 0.3
-        max_scale: 1.0
-
-    venue:
-      size:
-        radius: 3
-      fill_opacity: 0.8
-      colors:
-        school: "#e74c3c"
-        hospital: "#3498db"
-        university: "#9b59b6"
-        company: "#f39c12"
-        household: "#2ecc71"
-        land: "#8B4513"
-        church: "#9932CC"
-        market: "#FF6347"
-        default: "#95a5a6"
-      border:
-        color: "#ffffff"
-        width: 1
-        opacity: 1
-      zoom_scaling:
-        enabled: true
-        base_zoom: 6
-        scale_exponent: 0.5
         min_scale: 0.3
         max_scale: 3.0
 
@@ -364,7 +341,9 @@ events:
       fill_opacity: 0.6
     zoom_scaling:
       enabled: true
-      base_zoom: 1
+      # base_zoom omitted: events.js falls back to map.getZoom() at setup
+      # time, so it auto-tracks the actual displayed zoom instead of a
+      # hardcoded number that can drift (same trick as geo_unit markers).
       scale_exponent: 0.5
       min_scale: 0.3
       max_scale: 1.5
