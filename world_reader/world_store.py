@@ -93,7 +93,7 @@ class WorldStore:
         venues: Always None — Venue objects are not materialised.
     """
 
-    def __init__(self, geography, slim_statistics, unit_statistics,
+    def __init__(self, geography, unit_statistics,
                  geographical_distribution,
                  person_id_to_idx, subset_venue_ids, subtree_index,
                  venue_types_arr,
@@ -101,9 +101,13 @@ class WorldStore:
                  venue_parent_ids=None, venue_child_counts=None,
                  venue_child_total_members=None, venue_child_position=None,
                  children_by_parent_sorted=None, children_parent_ids_sorted=None,
-                 venue_ids=None, venue_id_to_idx=None, activity_names=None):
+                 venue_ids=None, venue_id_to_idx=None, activity_names=None,
+                 world_file_path=None, compute_activity_stats=False):
         self.geography = geography
-        self._slim_statistics = slim_statistics
+        self._slim_statistics = None
+        self._slim_statistics_computed = False
+        self._world_file_path = world_file_path
+        self._compute_activity_stats = compute_activity_stats
         self._unit_statistics = unit_statistics
         self.geographical_distribution = geographical_distribution
         self.person_id_to_idx = person_id_to_idx
@@ -124,6 +128,23 @@ class WorldStore:
         self.children_parent_ids_sorted   = children_parent_ids_sorted
         self.population = None
         self.venues = None
+
+    @property
+    def slim_statistics(self) -> dict:
+        """World-level summary statistics, computed lazily on first access.
+
+        Costs several seconds (per-property `value_counts` over the full
+        population/venue arrays), so it is deferred until something actually
+        asks for it (the `/api/world/statistics` route) rather than paid at
+        every cold start.
+        """
+        if not self._slim_statistics_computed:
+            with h5py.File(self._world_file_path, 'r') as f:
+                self._slim_statistics = compute_slim_statistics(
+                    f, self._compute_activity_stats
+                )
+            self._slim_statistics_computed = True
+        return self._slim_statistics
 
     def __str__(self):
         n_units = len(self.geography.units_by_id) if self.geography else 0
@@ -343,7 +364,6 @@ def build_world_store(input_file: str | Path, compute_activity_stats: bool = Fal
         unit_statistics = compute_unit_statistics(
             f, geography, include_activity_counts=compute_activity_stats
         )
-        slim_statistics = compute_slim_statistics(f, compute_activity_stats)
 
         # lookup arrays (cheap; serve single-record lazy reads)
         person_ids       = f['population/ids'][:]
@@ -418,7 +438,7 @@ def build_world_store(input_file: str | Path, compute_activity_stats: bool = Fal
     )
 
     world = WorldStore(
-        geography, slim_statistics, unit_statistics,
+        geography, unit_statistics,
         geographical_distribution,
         person_id_to_idx, subset_venue_ids, subtree_index,
         venue_types_arr,
@@ -432,6 +452,8 @@ def build_world_store(input_file: str | Path, compute_activity_stats: bool = Fal
         venue_ids=venue_ids,
         venue_id_to_idx=venue_id_to_idx,
         activity_names=activity_names,
+        world_file_path=str(input_file),
+        compute_activity_stats=compute_activity_stats,
     )
     logger.info("World store built in %.2fs: %s",
                 time.perf_counter() - t_start, world)

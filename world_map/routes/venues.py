@@ -108,8 +108,9 @@ def get_world_statistics():
             stats['total_venues'] = int(len(world.venue_types_arr))
             stats['venue_types'] = venue_type_names
 
-        # Merge in slim-mode aggregate statistics if available
-        slim_stats = getattr(world, '_slim_statistics', None)
+        # Merge in slim-mode aggregate statistics (computed lazily, on first
+        # access to this route, since it costs several seconds)
+        slim_stats = world.slim_statistics
         if slim_stats:
             stats['slim_statistics'] = slim_stats
 
