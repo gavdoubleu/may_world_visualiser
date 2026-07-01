@@ -20,5 +20,5 @@ build/
 dist/
 launch_medieval_map.sh
 export_medieval_map.sh
-world_map_configs/medieval.yaml
+world_map_configs/
 world_map/static/map_images/*

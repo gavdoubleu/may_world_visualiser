@@ -24,6 +24,8 @@ class AppConfig:
     geo_unit_names: dict[str, str] | None
     projection_type: str
     projection_kwargs: dict
+    map: dict
+    title: str | None
 
     @classmethod
     def load(cls, config_path: Path) -> 'AppConfig':
@@ -49,6 +51,9 @@ class AppConfig:
         projection_type = proj_cfg.get('type', 'web_mercator')
         projection_kwargs = {k: v for k, v in proj_cfg.items() if k not in ('type', 'bounds_epsg')}
 
+        map_settings = _load_map_settings(cfg.get('map', {}), config_path.parent)
+        title = cfg.get('title')
+
         return cls(
             panel=panel,
             theme=theme,
@@ -56,6 +61,8 @@ class AppConfig:
             geo_unit_names=geo_unit_names,
             projection_type=projection_type,
             projection_kwargs=projection_kwargs,
+            map=map_settings,
+            title=title,
         )
 
     @classmethod
@@ -68,7 +75,26 @@ class AppConfig:
             geo_unit_names=None,
             projection_type='web_mercator',
             projection_kwargs={},
+            map={'background': 'osm', 'image': None, 'bounds': None, 'attribution': None},
+            title=None,
         )
+
+
+def _load_map_settings(map_cfg: dict, config_dir: Path) -> dict:
+    """Read the 'map' config block. Local image paths are resolved relative to config_dir."""
+    image = map_cfg.get('image')
+    if image and not image.startswith(('http://', 'https://')):
+        image_path = Path(image)
+        if not image_path.is_absolute():
+            image_path = config_dir / image_path
+        image = str(image_path)
+
+    return {
+        'background': map_cfg.get('background', 'osm'),
+        'image': image,
+        'bounds': map_cfg.get('bounds'),
+        'attribution': map_cfg.get('attribution'),
+    }
 
 
 def _load_geo_unit_names(geo_cfg: dict, config_dir: Path) -> dict[str, str] | None:

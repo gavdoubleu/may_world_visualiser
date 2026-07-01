@@ -32,15 +32,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Load a world_state.h5 with OpenStreetMap background
+  # Load a world_state.h5 (map background, title etc. come from --config's
+  # 'map'/'title' keys — see world_map/yaml/config.yaml)
   python launch_world_map.py --world-file world_state.h5
-
-  # Use a custom background image (local file)
-  python launch_world_map.py --world-file world_state.h5 \\
-      --map-background image \\
-      --map-image /path/to/medieval_map.png \\
-      --map-bounds "56.0,2.0,49.5,-6.0" \\
-      --map-attribution "Medieval England Map - 1348 AD"
 
   # Include simulation events
   python launch_world_map.py --world-file world_state.h5 \\
@@ -77,33 +71,6 @@ Examples:
         help='Run in debug mode'
     )
 
-    # Map configuration arguments
-    parser.add_argument(
-        '--map-background',
-        type=str,
-        choices=['osm', 'image'],
-        default='osm',
-        help='Background map type: osm (OpenStreetMap) or image (custom image)'
-    )
-
-    parser.add_argument(
-        '--map-image',
-        type=str,
-        help='Path or URL to custom map background image (required if --map-background=image)'
-    )
-
-    parser.add_argument(
-        '--map-bounds',
-        type=str,
-        help='Geographic bounds for custom image: "north,east,south,west" (required if --map-background=image). Example: "55.0,2.0,50.0,-5.0"'
-    )
-
-    parser.add_argument(
-        '--map-attribution',
-        type=str,
-        help='Attribution text for custom map image'
-    )
-
     parser.add_argument(
         '--events-file',
         type=str,
@@ -137,21 +104,26 @@ Examples:
     if not world.population:
         print("WARNING: World has no population data")
 
-    # Parse map configuration
-    map_config = None
+    # Parse map configuration — sourced from --config's 'map' block, not CLI args,
+    # so the live server and the static exporter share one source of truth.
+    from world_map.config import AppConfig, _DEFAULT_CONFIG_PATH
+    config_path = Path(args.config) if args.config else None
+    cfg = AppConfig.load(config_path or _DEFAULT_CONFIG_PATH)
+    map_settings = cfg.map
 
-    if args.map_background == 'image':
-        if not args.map_image:
-            print("\nERROR: --map-image is required when --map-background=image\n")
+    if map_settings.get('background') == 'image':
+        image = map_settings.get('image')
+        bounds_str = map_settings.get('bounds')
+        if not image:
+            print("\nERROR: config's 'map.image' is required when map.background=image\n")
             sys.exit(1)
-
-        if not args.map_bounds:
-            print("\nERROR: --map-bounds is required when --map-background=image\n")
+        if not bounds_str:
+            print("\nERROR: config's 'map.bounds' is required when map.background=image\n")
             sys.exit(1)
 
         # Parse bounds
         try:
-            bounds_values = [float(x.strip()) for x in args.map_bounds.split(',')]
+            bounds_values = [float(x.strip()) for x in bounds_str.split(',')]
             if len(bounds_values) != 4:
                 raise ValueError("Expected 4 values")
 
@@ -166,14 +138,13 @@ Examples:
             bounds = [[south, west], [north, east]]
 
         except Exception as e:
-            print(f"\nERROR: Invalid bounds format: {e}")
+            print(f"\nERROR: Invalid 'map.bounds' format: {e}")
             print("Expected format: 'north,east,south,west'")
             print("Example: '55.0,2.0,50.0,-5.0'\n")
             sys.exit(1)
 
         # Check if image file exists (if it's a local path)
-        from pathlib import Path
-        image_path = args.map_image
+        image_path = image
 
         # If it's a local file path, convert to URL
         if not image_path.startswith(('http://', 'https://')):
@@ -198,12 +169,12 @@ Examples:
             'background_type': 'image',
             'image_url': image_path,
             'bounds': bounds,
-            'attribution': args.map_attribution or 'Custom Map Image'
+            'attribution': map_settings.get('attribution') or 'Custom Map Image'
         }
 
         print("\nMap Configuration:")
         print(f"  Type: Custom Image")
-        print(f"  Image: {args.map_image}")
+        print(f"  Image: {image}")
         print(f"  URL: {image_path}")
         print(f"  Bounds: {bounds}")
         print(f"  Attribution: {map_config['attribution']}")
@@ -214,13 +185,11 @@ Examples:
             'background_type': 'osm',
             'image_url': None,
             'bounds': None,
-            'attribution': '© OpenStreetMap contributors'
+            'attribution': map_settings.get('attribution') or '© OpenStreetMap contributors'
         }
         print("\nMap Configuration: OpenStreetMap (default)")
 
     # Initialize and run the Flask app
-    from pathlib import Path as _Path
-    config_path = _Path(args.config) if args.config else None
     app = create_app(world, args.world_file, map_config=map_config, config_path=config_path)
 
     # Initialize events if provided

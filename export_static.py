@@ -564,9 +564,6 @@ def _build_html(
                 logo_b64 = base64.b64encode(logo_file.read_bytes()).decode('ascii')
                 logo_html = f'<img id="app-logo" src="data:{mime};base64,{logo_b64}" alt="Logo">'
 
-    # Header title from theme, falling back to CLI --title
-    header_title = (theme or {}).get('title') or title
-
     theme_css_block = f'    <style>\n{theme_css}\n    </style>' if theme_css else ''
 
     return f"""<!DOCTYPE html>
@@ -589,7 +586,7 @@ def _build_html(
         <!-- Header -->
         <header>
             {logo_html}
-            <h1 id="app-title">{header_title}</h1>
+            <h1 id="app-title">{title}</h1>
             <div id="stats-summary"></div>
         </header>
 
@@ -598,10 +595,6 @@ def _build_html(
             <div class="sidebar-section">
                 <h3>Geography Levels</h3>
                 <div id="geography-levels"></div>
-            </div>
-            <div class="sidebar-section">
-                <h3>Statistics</h3>
-                <div id="world-stats"></div>
             </div>
         </div>
 
@@ -724,35 +717,6 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        '--map-background', choices=['osm', 'image'], default='osm',
-        help="Map background: 'osm' (OpenStreetMap) or 'image' (custom image)",
-    )
-    parser.add_argument(
-        '--map-image',
-        help=(
-            "Path to a local image file or a URL. "
-            "Local files are base64-embedded so the HTML stays self-contained. "
-            "Required when --map-background=image."
-        ),
-    )
-    parser.add_argument(
-        '--map-bounds',
-        metavar='N,E,S,W',
-        help=(
-            "Geographic bounds for the custom image as "
-            "'north,east,south,west' (e.g. '55,2,50,-5'). "
-            "Required when --map-background=image."
-        ),
-    )
-    parser.add_argument(
-        '--map-attribution',
-        help='Attribution text shown on the map for a custom image.',
-    )
-    parser.add_argument(
-        '--title', default='World Map Visualization',
-        help='HTML page title (default: "World Map Visualization")',
-    )
-    parser.add_argument(
         '--events-file',
         metavar='EVENTS_H5',
         help=(
@@ -785,7 +749,14 @@ def main() -> None:
     world = load_world_from_file(args.world_file)
     print(f'  World loaded: {world}')
 
-    # ---- [2] Build map config ------------------------------------------------
+    # ---- [2] Build map config — sourced from --config's 'map' block, not CLI
+    # args, so the live server and this exporter share one source of truth. ---
+    from world_map.config import AppConfig, _DEFAULT_CONFIG_PATH
+
+    config_path = Path(args.config) if args.config else None
+    cfg = AppConfig.load(config_path or _DEFAULT_CONFIG_PATH)
+    map_settings = cfg.map
+
     map_config: dict = {
         'background_type': 'osm',
         'image_url': None,
@@ -793,27 +764,29 @@ def main() -> None:
         'attribution': None,
     }
 
-    if args.map_background == 'image':
-        if not args.map_image:
-            print('ERROR: --map-image is required when --map-background=image')
+    if map_settings.get('background') == 'image':
+        image = map_settings.get('image')
+        bounds_str = map_settings.get('bounds')
+        if not image:
+            print("ERROR: config's 'map.image' is required when map.background=image")
             sys.exit(1)
-        if not args.map_bounds:
-            print('ERROR: --map-bounds is required when --map-background=image')
+        if not bounds_str:
+            print("ERROR: config's 'map.bounds' is required when map.background=image")
             sys.exit(1)
 
         # Parse bounds
         try:
-            vals = [float(x.strip()) for x in args.map_bounds.split(',')]
+            vals = [float(x.strip()) for x in bounds_str.split(',')]
             if len(vals) != 4:
                 raise ValueError('Expected 4 values')
             north, east, south, west = vals
             bounds = [[south, west], [north, east]]
         except Exception as exc:
-            print(f"ERROR: Invalid --map-bounds '{args.map_bounds}': {exc}")
+            print(f"ERROR: Invalid 'map.bounds' value '{bounds_str}': {exc}")
             print("  Expected format: 'north,east,south,west'  e.g. '55,2,50,-5'")
             sys.exit(1)
 
-        image_src = args.map_image
+        image_src = image
         if not image_src.startswith(('http://', 'https://')):
             img_path = Path(image_src)
             if not img_path.exists():
@@ -835,7 +808,7 @@ def main() -> None:
             'background_type': 'image',
             'image_url': image_src,
             'bounds': bounds,
-            'attribution': args.map_attribution or 'Custom Map Image',
+            'attribution': map_settings.get('attribution') or 'Custom Map Image',
         }
 
     # ---- [2] Collect API data ------------------------------------------------
@@ -844,7 +817,6 @@ def main() -> None:
 
     from world_map.app import create_app
 
-    config_path = Path(args.config) if args.config else None
     flask_app = create_app(world, args.world_file, map_config=map_config, config_path=config_path)
     flask_app.config['TESTING'] = True
 
@@ -940,7 +912,7 @@ def main() -> None:
         leaflet_css=leaflet_css,
         proj4_js=proj4_js,
         proj4leaflet_js=proj4leaflet_js,
-        title=args.title,
+        title=cfg.title or (theme or {}).get('title') or 'World Map Visualization',
         theme=theme,
         theme_css=theme_css,
         static_dir=static_dir,

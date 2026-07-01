@@ -49,9 +49,14 @@ def get_panel_config():
 
 @config_bp.route('/api/theme')
 def get_theme():
-    """Return theme configuration as JSON."""
+    """Return theme configuration as JSON, with the config's project-level title (if set)
+    taking precedence over the theme's own title."""
     try:
-        return jsonify(get_app_context().app_config.theme)
+        app_config = get_app_context().app_config
+        theme = dict(app_config.theme or {})
+        if app_config.title:
+            theme['title'] = app_config.title
+        return jsonify(theme)
     except Exception as e:
         logger.error(f"Error getting theme: {e}")
         return jsonify({'error': str(e)}), 500

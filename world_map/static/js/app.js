@@ -204,58 +204,9 @@ async function loadWorldStatistics() {
                 👥 ${stats.population.total_population.toLocaleString()} people
             `;
         }
-
-        displayWorldStats(stats);
     } catch (error) {
         console.error('Error loading world statistics:', error);
     }
-}
-
-function displayWorldStats(stats) {
-    const statsEl = document.getElementById('world-stats');
-    let html = '';
-
-    if (stats.population) {
-        html += `
-            <div class="stat-item">
-                <span class="stat-label">Total Population</span>
-                <span class="stat-value">${stats.population.total_population.toLocaleString()}</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Mean Age</span>
-                <span class="stat-value">${stats.population.mean_age.toFixed(1)}</span>
-            </div>
-        `;
-    }
-
-    if (stats.geography) {
-        html += `
-            <div class="stat-item">
-                <span class="stat-label">Geographic Units</span>
-                <span class="stat-value">${stats.geography.total_units.toLocaleString()}</span>
-            </div>
-        `;
-    }
-
-    if (stats.venues) {
-        html += `
-            <div class="stat-item">
-                <span class="stat-label">Venues</span>
-                <span class="stat-value">${stats.venues.total_venues.toLocaleString()}</span>
-            </div>
-        `;
-    }
-
-    if (stats.households) {
-        html += `
-            <div class="stat-item">
-                <span class="stat-label">Households</span>
-                <span class="stat-value">${stats.households.total_households.toLocaleString()}</span>
-            </div>
-        `;
-    }
-
-    statsEl.innerHTML = html;
 }
 
 // =============================================================================
