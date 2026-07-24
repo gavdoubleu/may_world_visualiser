@@ -1,0 +1,22 @@
+# Minimal upstream packaging shim: makes the app-agnostic `world_reader`
+# subpackage pip-installable on its own (top-level `import world_reader`),
+# without dragging in the Flask apps (world_map / world_explorer).
+# Downstream consumer: june_analysis `core/load_data/world` (ADR-0001).
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "world_reader"
+version = "0.1.0"
+description = "Lazy HDF5 reader for JUNE/MAY world_state.h5 (geography, population, venues)."
+requires-python = ">=3.10"
+dependencies = [
+    "h5py",
+    "numpy",
+    "pandas",
+]
+
+[tool.setuptools]
+# Only the reader packages — deliberately excludes world_map / world_explorer.
+packages = ["world_reader", "world_reader.record_reader"]
