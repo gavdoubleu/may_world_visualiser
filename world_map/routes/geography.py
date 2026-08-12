@@ -1,7 +1,9 @@
 """Geography API blueprint."""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 import logging
+
+import orjson
 
 from world_map.utils import convert_numpy_types
 from world_map.context import get_app_context
@@ -34,9 +36,18 @@ def get_geography_levels():
 
 @geography_bp.route('/api/geography/<level>')
 def get_geography_level(level):
-    """Get all geographical units at a specific level as GeoJSON."""
+    """Get all geographical units at a specific level as GeoJSON.
+
+    Built bodies are cached per level for the process lifetime — the world
+    file is read-only, so a level's GeoJSON never changes after first build.
+    """
     try:
-        world = get_app_context().world
+        ctx = get_app_context()
+        cached_body = ctx.geography_geojson_cache.get(level)
+        if cached_body is not None:
+            return Response(cached_body, mimetype='application/json')
+
+        world = ctx.world
         if not world.geography:
             return jsonify({'type': 'FeatureCollection', 'features': []})
 
@@ -44,28 +55,38 @@ def get_geography_level(level):
         if not units:
             return jsonify({'type': 'FeatureCollection', 'features': []})
 
+        # Hot loop over every unit in the level (~200k at SGU scale): bind the
+        # repeated lookups to locals and skip the numpy coercion — orjson
+        # serialises numpy scalars directly.
+        get_stats = world._unit_statistics.get
         features = []
-        for unit_name, unit in units.items():
-            if not unit.coordinates:
+        append_feature = features.append
+        for unit in units.values():
+            coordinates = unit.coordinates
+            if not coordinates:
                 continue
 
-            lat, lon = unit.coordinates
-            stats = world._unit_statistics.get(unit.id)
+            lat, lon = coordinates
+            stats = get_stats(unit.id)
+            venue_types = stats.venue_types if stats else {}
 
-            features.append(point_feature(lat, lon, {
-                'id': int(unit.id) if hasattr(unit.id, 'item') else unit.id,
-                'name': str(unit.name),
-                'level': str(unit.level),
+            append_feature(point_feature(lat, lon, {
+                'id': unit.id,
+                'name': unit.name,
+                'level': unit.level,
                 'population': stats.population if stats else 0,
-                'venues_count': stats.venues_count if stats else 0,
-                'venue_types': stats.venue_types if stats else {},
+                'venues_count': sum(venue_types.values()),
+                'venue_types': venue_types,
                 'has_parent': unit.parent is not None,
-                'children_count': int(len(unit.children)) if unit.children else 0,
+                'children_count': len(unit.children),
             }))
 
-        geojson = feature_collection(features)
-        logger.info(f"Returned {len(features)} features for level {level}")
-        return jsonify(geojson)
+        body = orjson.dumps(
+            feature_collection(features), option=orjson.OPT_SERIALIZE_NUMPY
+        )
+        ctx.geography_geojson_cache[level] = body
+        logger.info(f"Built and cached {len(features)} features for level {level}")
+        return Response(body, mimetype='application/json')
 
     except Exception as e:
         logger.error(f"Error getting geography level {level}: {e}")
