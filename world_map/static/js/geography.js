@@ -53,34 +53,6 @@ function getPopulationColor(population, colorConfig) {
     return thresholds[0]?.color || '#FFEDA0';
 }
 
-function createGeoUnitPopup(props, panelConfig) {
-    const popupConfig = panelConfig?.geo_unit_panel?.popup;
-
-    if (!popupConfig || !popupConfig.enabled) {
-        return `
-            <div class="popup-title">${props.name}</div>
-            <div class="popup-info"><strong>Level:</strong> ${props.level}</div>
-            <div class="popup-info"><strong>Population:</strong> ${props.population.toLocaleString()}</div>
-            <div class="popup-info"><strong>Venues:</strong> ${props.venues_count}</div>
-        `;
-    }
-
-    let html = '';
-    const fields = popupConfig.fields || [];
-
-    for (const field of fields) {
-        const value = _getFieldValue(props, field.name);
-        const formattedValue = _formatValue(value, field.format);
-        if (field.name === 'name') {
-            html += `<div class="popup-title">${formattedValue}</div>`;
-        } else {
-            html += `<div class="popup-info"><strong>${field.label}:</strong> ${formattedValue}</div>`;
-        }
-    }
-
-    return html;
-}
-
 // Zoom scaling
 
 let _zoomConfig = null;   // cached at setup time
@@ -92,6 +64,9 @@ function setupGeoUnitZoomListener(map, panelConfig, getLayerFn) {
     _zoomConfig = zoomConfig;
     const baseZoom = zoomConfig.base_zoom || map.getZoom() || 6;
 
+    // Walks only the drawn markers: the layer holds the current viewport, not
+    // the whole level, so this cost scales with what is on screen. Markers
+    // scrolling into view are rescaled as they are added, not here.
     map.on('zoomend', () => {
         const layer = getLayerFn();
         if (!layer) return;
@@ -136,23 +111,12 @@ function chooseDefaultGeographyLevel(levels, unitsPerLevel) {
     );
 }
 
-// Thin wrappers so geography.js can call utils/panel_builders without import
-function _getFieldValue(obj, path) {
-    if (typeof window !== 'undefined') return window.WorldMap.getFieldValue(obj, path);
-    return require('./utils').getFieldValue(obj, path);
-}
-
-function _formatValue(value, format) {
-    if (typeof window !== 'undefined') return window.WorldMap.formatValue(value, format);
-    return require('./panel_builders').formatValue(value, format);
-}
-
 if (typeof module !== 'undefined') {
-    module.exports = { calculateMarkerRadius, getPopulationColor, createGeoUnitPopup,
+    module.exports = { calculateMarkerRadius, getPopulationColor,
         chooseDefaultGeographyLevel };
 }
 if (typeof window !== 'undefined') {
     window.WorldMap = window.WorldMap || {};
-    Object.assign(window.WorldMap, { calculateMarkerRadius, getPopulationColor, createGeoUnitPopup,
+    Object.assign(window.WorldMap, { calculateMarkerRadius, getPopulationColor,
         setupGeoUnitZoomListener, _getZoomScaleFactor, chooseDefaultGeographyLevel });
 }

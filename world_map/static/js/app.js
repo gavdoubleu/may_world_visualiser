@@ -20,7 +20,16 @@ const state = {
     panelConfig: null,
     geoUnitNameToId: {},
     baseZoom: 6,
-    hasFitInitialGeographyBounds: false
+    hasFitInitialGeographyBounds: false,
+    // Marker pool: every geo_unit marker for the selected level, built once per
+    // level load. state.layers.geography holds only those currently in view.
+    geoUnitMarkers: [],
+    geoUnitBounds: null,
+    geoUnitLatitudes: null,
+    geoUnitLongitudes: null,
+    geoUnitOnMap: null,
+    allGeoUnitMarkersOnMap: false,
+    geoUnitPopup: null
 };
 
 // =============================================================================
@@ -146,7 +155,8 @@ function initializeMap() {
 
         state.map = L.map('map', {
             crs: buildLeafletCRS(config.crs, true),
-            minZoom: 1, maxZoom: 18, attributionControl: true
+            minZoom: 1, maxZoom: 18, attributionControl: true,
+            preferCanvas: true
         }).setView([centerLat, centerLon], 6);
 
         const bounds = L.latLngBounds(L.latLng(south, west), L.latLng(north, east));
@@ -159,7 +169,7 @@ function initializeMap() {
         state.imageBounds = bounds;
         state.map.fitBounds(bounds);
     } else {
-        state.map = L.map('map').setView([51.5074, -0.1278], 6);
+        state.map = L.map('map', { preferCanvas: true }).setView([51.5074, -0.1278], 6);
         state.baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors', maxZoom: 19
         }).addTo(state.map);
@@ -170,6 +180,10 @@ function initializeMap() {
         state.panelConfig,
         () => state.layers.geography
     ) || state.baseZoom;
+
+    // Fires after zoomend on a zoom, so newly-visible markers are added with
+    // the scale factor the rescale walk has just settled on.
+    state.map.on('moveend', updateGeoUnitViewport);
 }
 
 // =============================================================================
@@ -309,7 +323,19 @@ async function loadGeographyLevel(level) {
     try {
         if (state.layers.geography) {
             state.map.removeLayer(state.layers.geography);
+            state.layers.geography = null;
         }
+        // The shared popup belongs to the map, not to a marker, so dropping the
+        // layer no longer closes it — a stale unit name would outlive its level.
+        if (state.geoUnitPopup && state.map.hasLayer(state.geoUnitPopup)) {
+            state.map.closePopup(state.geoUnitPopup);
+        }
+        state.geoUnitMarkers = [];
+        state.geoUnitBounds = null;
+        state.geoUnitLatitudes = null;
+        state.geoUnitLongitudes = null;
+        state.geoUnitOnMap = null;
+        state.allGeoUnitMarkersOnMap = false;
 
         if (!state.showPopulation) return;
 
@@ -325,32 +351,50 @@ async function loadGeographyLevel(level) {
         const zoomScale = WorldMap._getZoomScaleFactor
             ? WorldMap._getZoomScaleFactor(state.map, state.baseZoom)
             : 1;
+        const borderConfig = styleConfig.border || {};
 
-        state.layers.geography = L.geoJSON(geojson, {
-            pointToLayer: (feature, latlng) => {
-                const props = feature.properties;
-                const population = props.population || 0;
-                const baseRadius = WorldMap.calculateMarkerRadius(population, styleConfig.size);
-                const scaledRadius = baseRadius * zoomScale;
-                const fillColor = WorldMap.getPopulationColor(population, styleConfig.color);
-                const borderConfig = styleConfig.border || {};
+        // Coordinates are mirrored into flat arrays so the viewport scan can run
+        // as plain numeric comparisons. Asking each marker for its LatLng and
+        // handing that to bounds.contains() measured ~450 ms per map move at
+        // 235k units — the scan, not the drawing, was the cost of panning.
+        const unitCount = geojson.features.length;
+        state.geoUnitLatitudes = new Float64Array(unitCount);
+        state.geoUnitLongitudes = new Float64Array(unitCount);
+        state.geoUnitOnMap = new Uint8Array(unitCount);
 
-                return L.circleMarker(latlng, {
-                    radius: scaledRadius,
-                    baseRadius: baseRadius,
-                    fillColor: fillColor,
-                    color: borderConfig.color || '#fff',
-                    weight: borderConfig.width || 1,
-                    opacity: borderConfig.opacity || 1,
-                    fillOpacity: styleConfig.fill_opacity || 0.7
-                });
-            },
-            onEachFeature: (feature, layer) => {
-                const props = feature.properties;
-                layer.bindPopup(WorldMap.createGeoUnitPopup(props, state.panelConfig));
-                layer.on('click', () => WorldMap.showUnitDetails(props.name));
-            }
-        }).addTo(state.map);
+        const markerCoordinates = [];
+        state.geoUnitMarkers = geojson.features.map((feature, index) => {
+            const props = feature.properties;
+            const [longitude, latitude] = feature.geometry.coordinates;
+            const latlng = L.latLng(latitude, longitude);
+            markerCoordinates.push(latlng);
+            state.geoUnitLatitudes[index] = latitude;
+            state.geoUnitLongitudes[index] = longitude;
+
+            const population = props.population || 0;
+            const baseRadius = WorldMap.calculateMarkerRadius(population, styleConfig.size);
+
+            const marker = L.circleMarker(latlng, {
+                radius: baseRadius * zoomScale,
+                baseRadius: baseRadius,
+                fillColor: WorldMap.getPopulationColor(population, styleConfig.color),
+                color: borderConfig.color || '#fff',
+                weight: borderConfig.width || 1,
+                opacity: borderConfig.opacity || 1,
+                fillOpacity: styleConfig.fill_opacity || 0.7
+            });
+
+            marker.on('click', () => {
+                openGeoUnitPopup(latlng, props.name);
+                WorldMap.showUnitDetails(props.name);
+            });
+
+            return marker;
+        });
+
+        state.geoUnitBounds = L.latLngBounds(markerCoordinates);
+        state.allGeoUnitMarkersOnMap = false;
+        state.layers.geography = L.layerGroup().addTo(state.map);
 
         // Build name → integer id lookup for event correlation
         state.geoUnitNameToId = {};
@@ -365,13 +409,94 @@ async function loadGeographyLevel(level) {
         // (or one) units, since a degenerate/small bounding box has no real
         // extent to fit.
         if (!state.hasFitInitialGeographyBounds) {
-            state.map.fitBounds(state.layers.geography.getBounds());
+            state.map.fitBounds(state.geoUnitBounds);
             state.hasFitInitialGeographyBounds = true;
         }
+
+        updateGeoUnitViewport();
 
     } catch (error) {
         console.error('Error loading geography level:', error);
     }
+}
+
+// Draw only the markers currently in view. The pool is built once per level
+// load; this adds and removes the markers that cross the viewport edge, so
+// panning and zooming never rebuilds it.
+//
+// When the viewport already contains every unit there is nothing to cull, so
+// the per-marker walk is skipped entirely and the whole level is drawn — the
+// wide view then costs exactly what it did before culling existed. That the
+// widest view stays the slowest is accepted: thinning or hiding units at low
+// zoom was considered and rejected.
+function updateGeoUnitViewport() {
+    const layer = state.layers.geography;
+    if (!layer || state.geoUnitMarkers.length === 0) return;
+
+    const viewportBounds = state.map.getBounds();
+    const markers = state.geoUnitMarkers;
+    const onMap = state.geoUnitOnMap;
+    const zoomScale = WorldMap._getZoomScaleFactor(state.map, state.baseZoom);
+
+    // Markers entering the viewport missed the zoomend rescale, which only
+    // walks what is drawn, so apply the current scale on the way in.
+    const addMarker = (index) => {
+        const marker = markers[index];
+        marker.setRadius(marker.options.baseRadius * zoomScale);
+        layer.addLayer(marker);
+        onMap[index] = 1;
+    };
+
+    if (viewportBounds.contains(state.geoUnitBounds)) {
+        if (state.allGeoUnitMarkersOnMap) return;
+        for (let index = 0; index < markers.length; index++) {
+            if (!onMap[index]) addMarker(index);
+        }
+        state.allGeoUnitMarkersOnMap = true;
+        return;
+    }
+
+    state.allGeoUnitMarkersOnMap = false;
+
+    // Compared as bare numbers rather than via bounds.contains(). No dateline
+    // handling: a world spanning the antimeridian would need the longitude
+    // test splitting in two.
+    const south = viewportBounds.getSouth();
+    const north = viewportBounds.getNorth();
+    const west = viewportBounds.getWest();
+    const east = viewportBounds.getEast();
+    const latitudes = state.geoUnitLatitudes;
+    const longitudes = state.geoUnitLongitudes;
+
+    for (let index = 0; index < markers.length; index++) {
+        const latitude = latitudes[index];
+        const longitude = longitudes[index];
+        const isInView = latitude >= south && latitude <= north &&
+                         longitude >= west && longitude <= east;
+
+        if (isInView) {
+            if (!onMap[index]) addMarker(index);
+        } else if (onMap[index]) {
+            layer.removeLayer(markers[index]);
+            onMap[index] = 0;
+        }
+    }
+}
+
+// One popup reused for every geo_unit, rather than one bound per marker: at
+// ~235k units the bound-popup objects alone were a measurable share of load.
+// Content is just the name — the info panel carries the statistics.
+function openGeoUnitPopup(latlng, unitName) {
+    if (!state.geoUnitPopup) {
+        // autoPan would shift the map on open, firing moveend and re-running
+        // the cull for a marker the user can already see.
+        state.geoUnitPopup = L.popup({ autoPan: false });
+    }
+
+    state.geoUnitPopup
+        .setLatLng(latlng)
+        .setContent(`<div class="popup-title">${unitName}</div>`);
+    state.map.openPopup(state.geoUnitPopup);
 }
 
 // =============================================================================

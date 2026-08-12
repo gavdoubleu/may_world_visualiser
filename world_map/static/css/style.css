@@ -394,23 +394,12 @@ header h1 {
     background: var(--theme-surface);
 }
 
+/* Geo_unit popups carry only the unit name; the info panel carries the rest. */
 .popup-title {
     font-weight: 600;
     font-size: 1.1rem;
     color: var(--theme-accent);
-    margin-bottom: 8px;
-}
-
-.popup-info {
-    margin-bottom: 4px;
-    color: var(--theme-text);
-    background: var(--theme-surface-raised);
-    padding: 3px 6px;
-    border-radius: 3px;
-}
-
-.popup-info strong {
-    color: var(--theme-text-muted);
+    margin-bottom: 0;
 }
 
 

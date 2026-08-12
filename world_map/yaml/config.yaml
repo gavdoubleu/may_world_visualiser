@@ -110,23 +110,6 @@ panel:
   geo_unit_panel:
     title_field: "name"
 
-    popup:
-      enabled: true
-      fields:
-        - name: "name"
-          label: "Name"
-          type: "attribute"
-        - name: "level"
-          label: "Level"
-          type: "attribute"
-        - name: "population"
-          label: "Population"
-          type: "attribute"
-          format: "number"
-        - name: "venues_count"
-          label: "Venues"
-          type: "attribute"
-
     detail_sections:
 
       - name: "basic_info"
