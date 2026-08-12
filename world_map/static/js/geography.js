@@ -118,6 +118,24 @@ function _getZoomScaleFactor(map, baseZoom) {
     return Math.max(minScale, Math.min(maxScale, rawScale));
 }
 
+// Default to the coarsest level (fewest units) rather than whichever level the
+// HDF5 happens to list first — that is the finest level (e.g. SGU, ~200k units)
+// for census-derived worlds, making initial page load the slowest possible one.
+// Ties keep the server's level ordering.
+function chooseDefaultGeographyLevel(levels, unitsPerLevel) {
+    if (!levels || levels.length === 0) return null;
+
+    const unitCount = (level) => {
+        const count = (unitsPerLevel || {})[level];
+        return typeof count === 'number' ? count : Infinity;
+    };
+
+    return levels.reduce(
+        (coarsest, level) => (unitCount(level) < unitCount(coarsest) ? level : coarsest),
+        levels[0]
+    );
+}
+
 // Thin wrappers so geography.js can call utils/panel_builders without import
 function _getFieldValue(obj, path) {
     if (typeof window !== 'undefined') return window.WorldMap.getFieldValue(obj, path);
@@ -130,10 +148,11 @@ function _formatValue(value, format) {
 }
 
 if (typeof module !== 'undefined') {
-    module.exports = { calculateMarkerRadius, getPopulationColor, createGeoUnitPopup };
+    module.exports = { calculateMarkerRadius, getPopulationColor, createGeoUnitPopup,
+        chooseDefaultGeographyLevel };
 }
 if (typeof window !== 'undefined') {
     window.WorldMap = window.WorldMap || {};
     Object.assign(window.WorldMap, { calculateMarkerRadius, getPopulationColor, createGeoUnitPopup,
-        setupGeoUnitZoomListener, _getZoomScaleFactor });
+        setupGeoUnitZoomListener, _getZoomScaleFactor, chooseDefaultGeographyLevel });
 }

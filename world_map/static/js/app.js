@@ -276,17 +276,19 @@ async function loadGeographyLevels() {
         const response = await fetch('/api/geography/levels');
         const data = await response.json();
 
+        const defaultLevel = WorldMap.chooseDefaultGeographyLevel(data.levels, data.units_per_level);
+
         const container = document.getElementById('geography-levels');
-        container.innerHTML = data.levels.map((level, index) => `
-            <button class="level-button ${index === 0 ? 'active' : ''}"
+        container.innerHTML = data.levels.map((level) => `
+            <button class="level-button ${level === defaultLevel ? 'active' : ''}"
                     data-level="${level}"
                     onclick="WorldMap.selectGeographyLevel('${level}')">
                 ${level} (${data.units_per_level[level].toLocaleString()} units)
             </button>
         `).join('');
 
-        if (data.levels.length > 0) {
-            selectGeographyLevel(data.levels[0]);
+        if (defaultLevel) {
+            selectGeographyLevel(defaultLevel);
         }
     } catch (error) {
         console.error('Error loading geography levels:', error);

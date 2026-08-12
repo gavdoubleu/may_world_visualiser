@@ -64,3 +64,26 @@ describe('getPopulationColor', () => {
         expect(getPopulationColor(0, colorConfig)).toBe('#aaa');
     });
 });
+
+describe('chooseDefaultGeographyLevel', () => {
+    const { chooseDefaultGeographyLevel } = require('../../world_map/static/js/geography');
+
+    test('picks the coarsest level, not the first listed', () => {
+        const levels = ['SGU', 'MSOA', 'region'];
+        const counts = { SGU: 200000, MSOA: 8000, region: 10 };
+        expect(chooseDefaultGeographyLevel(levels, counts)).toBe('region');
+    });
+
+    test('ties keep server ordering', () => {
+        expect(chooseDefaultGeographyLevel(['a', 'b'], { a: 5, b: 5 })).toBe('a');
+    });
+
+    test('levels with no count are never preferred', () => {
+        expect(chooseDefaultGeographyLevel(['a', 'b'], { b: 3 })).toBe('b');
+    });
+
+    test('returns null for no levels', () => {
+        expect(chooseDefaultGeographyLevel([], {})).toBeNull();
+        expect(chooseDefaultGeographyLevel(undefined, undefined)).toBeNull();
+    });
+});
