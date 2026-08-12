@@ -500,7 +500,7 @@ def compute_population_statistics(f: h5py.File) -> dict:
 
     Returns:
         `{total_people: 0}` if there is no population. Otherwise
-        `{total_people, age_stats: {mean, min, max}, sex_distribution}`.
+        `{total_people, age_stats: {mean, median, min, max}, sex_distribution}`.
     """
     if 'population' not in f:
         return {'total_people': 0}
@@ -528,6 +528,7 @@ def compute_population_statistics(f: h5py.File) -> dict:
         'total_people': int(total),
         'age_stats': {
             'mean': round(float(np.mean(ages)), 2),
+            'median': round(float(np.median(ages)), 2),
             'min': int(np.min(ages)),
             'max': int(np.max(ages)),
         },

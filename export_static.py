@@ -170,6 +170,10 @@ def _collect_data(flask_app, world, geography_units_all,
         total_bytes += _json_size(val)
     data['events_available'] = False  # events require a live server
 
+    # Static export always shows the sidebar statistics panel, regardless of
+    # the live server's config.yaml setting.
+    data['panel_config'].setdefault('sidebar_statistics', {})['enabled'] = True
+
     # ---- Geography GeoJSON per level -----------------------------------------
     print("  Fetching geography GeoJSON ...")
     geography_by_level: dict = {}

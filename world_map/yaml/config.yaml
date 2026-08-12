@@ -101,6 +101,12 @@ geo_unit_coordinates:
 
 panel:
 
+  # Sidebar "Statistics" section: people count, mean/median age, venue type
+  # counts. Off by default for the live server; export_static.py always
+  # forces this on regardless of this setting.
+  sidebar_statistics:
+    enabled: false
+
   geo_unit_panel:
     title_field: "name"
 

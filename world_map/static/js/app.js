@@ -205,9 +205,66 @@ async function loadWorldStatistics() {
                 👥 ${stats.population.total_population.toLocaleString()} people
             `;
         }
+
+        if (state.panelConfig?.sidebar_statistics?.enabled) {
+            renderSidebarStatistics(stats);
+        }
     } catch (error) {
         console.error('Error loading world statistics:', error);
     }
+}
+
+function renderSidebarStatistics(stats) {
+    const totalPeople = stats.total_people;
+    const ageStats    = stats.age_stats;
+    const venueCounts = stats.venue_type_counts;
+    if (totalPeople === undefined && !ageStats && !venueCounts) return;
+
+    let html = '';
+    if (totalPeople !== undefined) {
+        html += `
+            <div class="stat-item">
+                <span class="stat-label">People</span>
+                <span class="stat-value">${totalPeople.toLocaleString()}</span>
+            </div>
+        `;
+    }
+    if (ageStats) {
+        html += `
+            <div class="stat-item">
+                <span class="stat-label">Mean age</span>
+                <span class="stat-value">${ageStats.mean.toFixed(1)}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Median age</span>
+                <span class="stat-value">${ageStats.median.toFixed(1)}</span>
+            </div>
+        `;
+    }
+    if (venueCounts && Object.keys(venueCounts).length) {
+        const sortedTypes = Object.entries(venueCounts).sort((a, b) => b[1] - a[1]);
+        html += '<ul class="venue-type-list">';
+        for (const [typeName, count] of sortedTypes) {
+            html += `
+                <li class="stat-item">
+                    <span class="stat-label">${typeName}</span>
+                    <span class="stat-value">${count.toLocaleString()}</span>
+                </li>
+            `;
+        }
+        html += '</ul>';
+    }
+    if (!html) return;
+
+    let section = document.getElementById('sidebar-statistics');
+    if (!section) {
+        section = document.createElement('div');
+        section.id = 'sidebar-statistics';
+        section.className = 'sidebar-section';
+        section.innerHTML = '<h3>Statistics</h3><div id="sidebar-statistics-content"></div>';
+        document.getElementById('sidebar').appendChild(section);
+    }
+    document.getElementById('sidebar-statistics-content').innerHTML = html;
 }
 
 // =============================================================================

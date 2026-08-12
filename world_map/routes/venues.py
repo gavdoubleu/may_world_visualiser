@@ -107,6 +107,7 @@ def get_world_statistics():
         if venue_type_names:
             stats['total_venues'] = int(len(world.venue_types_arr))
             stats['venue_types'] = venue_type_names
+            stats['venue_type_counts'] = ctx.record_reader.get_venue_type_counts()
 
         # Merge in slim-mode aggregate statistics (computed lazily, on first
         # access to this route, since it costs several seconds)
