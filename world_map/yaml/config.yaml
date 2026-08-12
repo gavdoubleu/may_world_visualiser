@@ -214,9 +214,9 @@ panel:
       size:
         method: "sqrt"
         characteristic_population: 100
-        min_radius: 3
-        max_radius: 15
-        scale: 5
+        min_radius: 2
+        max_radius: 11
+        scale: 4
       color:
         method: "threshold"
         thresholds:
