@@ -7,6 +7,7 @@ import pandas as pd
 from world_reader.convert import SEX_DECODE, decode_str
 from world_reader.id_index import IdIndex
 from world_reader.pagination import calc_total_pages
+from world_reader.ragged_hdf5 import bounds_for_sorted_key, dedup_with_inverse, ragged_bounds
 
 
 class _VenueReads:
@@ -35,8 +36,8 @@ class _VenueReads:
         if row == IdIndex.MISSING:
             return {'venue_id': venue_id, 'venue_name': str(venue_id), 'subsets': []}
 
-        first_sub = int(np.searchsorted(self._subset_venue_ids, row, side='left'))
-        last_sub  = int(np.searchsorted(self._subset_venue_ids, row, side='right'))
+        first_sub, last_sub = bounds_for_sorted_key(self._subset_venue_ids, row)
+        first_sub, last_sub = int(first_sub), int(last_sub)
 
         if first_sub >= last_sub:
             return {'venue_id': venue_id, 'venue_name': str(venue_id), 'subsets': []}
@@ -49,7 +50,6 @@ class _VenueReads:
                 f['metadata/names/subsets'][first_sub:last_sub]).str.decode('utf-8').tolist()
             members_offsets  = f['venues/subsets/members_offsets']
             members_flat     = f['venues/subsets/members_flat']
-            n_subsets        = len(members_offsets)
             n_members_flat   = len(members_flat)
 
             pop_ids     = f['population/ids']
@@ -64,11 +64,8 @@ class _VenueReads:
                 if subset_filter and sname != subset_filter:
                     continue
 
-                ms    = int(members_offsets[subset_row])
-                me    = (int(members_offsets[subset_row + 1])
-                         if subset_row + 1 < n_subsets
-                         else n_members_flat)
-                total = me - ms
+                ms, me = ragged_bounds(members_offsets, subset_row, n_members_flat)
+                total  = me - ms
 
                 page_start = ms + (page - 1) * per_page
                 page_end   = min(ms + page * per_page, me)
@@ -82,22 +79,17 @@ class _VenueReads:
                     })
                     continue
 
-                page_idxs   = np.array(members_flat[page_start:page_end], dtype=np.int64)
-                array_idxs  = self._person_id_to_idx[page_idxs]
-                sort_order  = np.argsort(array_idxs)
-                sorted_idxs = array_idxs[sort_order]
-                idx_list    = sorted_idxs.tolist()
+                page_idxs = np.array(members_flat[page_start:page_end], dtype=np.int64)
+                array_idxs = self._person_id_to_idx[page_idxs]
+                # dedup/sort once, reuse across all four parallel columns —
+                # they share one row ordering.
+                unique_idxs, inverse = dedup_with_inverse(array_idxs)
+                idx_list = unique_idxs.tolist()
 
-                ids_b   = pop_ids[idx_list]
-                ages_b  = pop_ages[idx_list]
-                sexes_b = pop_sexes[idx_list]
-                geo_b   = pop_geo_ids[idx_list]
-
-                unsort  = np.argsort(sort_order)
-                ids_b   = ids_b[unsort]
-                ages_b  = ages_b[unsort]
-                sexes_b = sexes_b[unsort]
-                geo_b   = geo_b[unsort]
+                ids_b   = pop_ids[idx_list][inverse]
+                ages_b  = pop_ages[idx_list][inverse]
+                sexes_b = pop_sexes[idx_list][inverse]
+                geo_b   = pop_geo_ids[idx_list][inverse]
 
                 members = []
                 for id_val, age_val, sex_val, geo_id_val in zip(ids_b, ages_b, sexes_b, geo_b):
@@ -420,8 +412,8 @@ class _VenueReads:
             f: Open HDF5 world file.
             venue_id: HDF5 row index of the venue (not the logical venue ID).
         """
-        first = int(np.searchsorted(self._subset_venue_ids, venue_id, side='left'))
-        last  = int(np.searchsorted(self._subset_venue_ids, venue_id, side='right'))
+        first, last = bounds_for_sorted_key(self._subset_venue_ids, venue_id)
+        first, last = int(first), int(last)
         if first >= last:
             return []
         names   = f['metadata/names/subsets'][first:last]

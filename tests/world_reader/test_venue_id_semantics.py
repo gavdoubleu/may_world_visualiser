@@ -191,6 +191,107 @@ def test_load_venue_members_resolves_logical_id(gapped_venues_loader):
     assert empty['subsets'] == []
 
 
+@pytest.fixture
+def scrambled_members_h5(tmp_path):
+    """One venue whose subset member order, once translated through
+    `_person_id_to_idx`, is non-monotonic relative to population storage row.
+
+    population/ids = [50, 10, 30, 20, 40] at rows [0, 1, 2, 3, 4] — storage
+    order is deliberately not sorted by logical id. The subset's
+    members_flat lists logical ids in the order [40, 50, 20, 10, 30], which
+    resolves to storage rows [4, 0, 3, 1, 2] — non-monotonic, so
+    `load_venue_members` must sort-read-then-unsort to preserve this order
+    in its output rather than returning storage-row order.
+
+    A second venue (row 1, logical id 200, no subsets) exercises the >1
+    venue requirement without adding to the ordering scenario.
+    """
+    h5_path = tmp_path / 'scrambled_members.h5'
+    dt = h5py.string_dtype()
+    with h5py.File(h5_path, 'w') as f:
+        f.create_dataset('geography/ids',        data=np.array([0], dtype=np.int32))
+        f.create_dataset('geography/parent_ids', data=np.array([-1], dtype=np.int32))
+        f.create_dataset('geography/levels',     data=np.array([0], dtype=np.int32))
+        f.create_dataset('metadata/names/geography', data=np.array([b'London'], dtype=dt))
+        f.create_dataset('metadata/registries/geo_levels', data=np.array([b'city'], dtype=dt))
+
+        f.create_dataset('population/ids',
+                         data=np.array([50, 10, 30, 20, 40], dtype=np.int32))
+        f.create_dataset('population/ages',
+                         data=np.array([50, 10, 30, 20, 40], dtype=np.int32))  # age == id, for assertions
+        f.create_dataset('population/sexes',
+                         data=np.array([0, 1, 0, 1, 0], dtype=np.uint8))
+        f.create_dataset('population/geo_unit_ids',
+                         data=np.array([0, 0, 0, 0, 0], dtype=np.int32))
+
+        f.create_dataset('venues/ids',          data=np.array([100, 200], dtype=np.int32))
+        f.create_dataset('venues/geo_unit_ids', data=np.array([0, 0], dtype=np.int32))
+        f.create_dataset('venues/types',        data=np.array([0, 0], dtype=np.uint8))
+        f.create_dataset('venues/parent_ids',   data=np.array([-1, -1], dtype=np.int32))
+        f.create_dataset('venues/latitudes',    data=np.array([51.5, 51.6], dtype=np.float32))
+        f.create_dataset('venues/longitudes',   data=np.array([-0.1, -0.2], dtype=np.float32))
+        f.create_dataset('metadata/names/venues',
+                         data=np.array([b'Hall', b'Empty'], dtype=dt))
+        f.create_dataset('metadata/registries/venue_types',
+                         data=np.array([b'hall'], dtype=dt))
+
+        f.create_dataset('venues/subsets/venue_ids',       data=np.array([0], dtype=np.int32))
+        f.create_dataset('venues/subsets/member_counts',   data=np.array([5], dtype=np.int32))
+        f.create_dataset('venues/subsets/members_offsets', data=np.array([0, 5], dtype=np.int64))
+        f.create_dataset('venues/subsets/members_flat',
+                         data=np.array([40, 50, 20, 10, 30], dtype=np.int32))
+        f.create_dataset('metadata/names/subsets',
+                         data=np.array([b'attendees'], dtype=dt))
+    return h5_path
+
+
+@pytest.fixture
+def scrambled_members_loader(scrambled_members_h5):
+    world = build_world_store(str(scrambled_members_h5))
+    return RecordReader(str(scrambled_members_h5), world)
+
+
+def test_load_venue_members_preserves_members_flat_order(scrambled_members_loader):
+    """Non-monotonic storage rows must not leak into output order."""
+    result = scrambled_members_loader.load_venue_members(
+        100, page=1, per_page=50, subset_filter=None)
+    member_ids = [member['id'] for member in result['subsets'][0]['members']]
+    assert member_ids == [40, 50, 20, 10, 30]
+    # age == id in this fixture, so this also confirms age/sex/geo_unit rows
+    # travel with the right id rather than being scattered independently.
+    member_ages = [member['age'] for member in result['subsets'][0]['members']]
+    assert member_ages == [40, 50, 20, 10, 30]
+
+
+def test_load_venue_members_pagination_preserves_order_per_page(scrambled_members_loader):
+    """`page_idxs` slices `members_flat` before the reorder/restore step —
+    each page must preserve its own slice's members_flat order."""
+    page_1 = scrambled_members_loader.load_venue_members(
+        100, page=1, per_page=2, subset_filter=None)
+    ids_1 = [member['id'] for member in page_1['subsets'][0]['members']]
+    assert ids_1 == [40, 50]
+
+    page_2 = scrambled_members_loader.load_venue_members(
+        100, page=2, per_page=2, subset_filter=None)
+    ids_2 = [member['id'] for member in page_2['subsets'][0]['members']]
+    assert ids_2 == [20, 10]
+
+    page_3 = scrambled_members_loader.load_venue_members(
+        100, page=3, per_page=2, subset_filter=None)
+    ids_3 = [member['id'] for member in page_3['subsets'][0]['members']]
+    assert ids_3 == [30]
+
+    total = page_1['subsets'][0]['total']
+    assert total == 5
+    assert page_1['subsets'][0]['total_pages'] == 3
+
+
+def test_load_venue_members_returns_empty_for_venue_without_subsets(scrambled_members_loader):
+    empty = scrambled_members_loader.load_venue_members(
+        200, page=1, per_page=50, subset_filter=None)
+    assert empty['subsets'] == []
+
+
 def test_load_unit_venues_returns_logical_ids(gapped_venues_loader):
     # London=geo_id 0, Camden=geo_id 1 (hardcoded in gapped_venues_h5 fixture)
     london = gapped_venues_loader.load_unit_venues(0, page=1, per_page=50, type_filter=None)

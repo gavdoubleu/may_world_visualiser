@@ -7,6 +7,7 @@ import pandas as pd
 from world_reader.convert import SEX_DECODE, decode_str
 from world_reader.id_index import IdIndex
 from world_reader.pagination import calc_total_pages
+from world_reader.ragged_hdf5 import bounds_for_sorted_key, dedup_with_inverse, ragged_bounds
 
 
 class _PersonReads:
@@ -30,12 +31,9 @@ class _PersonReads:
             return None
 
         with h5py.File(self._hdf5_path, 'r') as f:
-            offsets  = f['activity_mappings/activity_map/activity_offsets']
-            n_people = len(offsets)
-            start    = int(offsets[person_array_idx])
-            end      = (int(offsets[person_array_idx + 1])
-                        if person_array_idx + 1 < n_people
-                        else int(f['activity_mappings/activity_map/activity_data'].shape[0]))
+            offsets           = f['activity_mappings/activity_map/activity_offsets']
+            activity_data_len = f['activity_mappings/activity_map/activity_data'].shape[0]
+            start, end        = ragged_bounds(offsets, person_array_idx, activity_data_len)
 
             if start >= end:
                 return []
@@ -57,13 +55,13 @@ class _PersonReads:
 
             # venue_name / venue_geo_id: dedup before reading. h5py's
             # fancy-indexed reads require increasing, de-duplicated index
-            # order (see load_venue_members's argsort/unsort workaround for
-            # the same constraint) — np.unique's sorted+unique output
+            # order (the same constraint dedup_with_inverse handles in
+            # load_venue_members) — np.unique's sorted+unique output
             # satisfies that for free, and as a bonus collapses repeat
             # visits to the same venue (e.g. "home" appearing many times in
             # one person's activities) to a single HDF5 read instead of one
             # read per activity.
-            unique_venues, venue_inverse = np.unique(venue_row, return_inverse=True)
+            unique_venues, venue_inverse = dedup_with_inverse(venue_row)
             venue_idx      = unique_venues.tolist()
             venue_name_u   = pd.Series(venue_names[venue_idx]).str.decode('utf-8').to_numpy()
             venue_geo_id_u = venue_geo_ids[venue_idx]
@@ -78,14 +76,14 @@ class _PersonReads:
             # in-memory (self._subset_venue_ids is already resident), scatter
             # back to every activity to get subset_row, then dedup *that*
             # before the one HDF5 read.
-            first_sub_u = np.searchsorted(self._subset_venue_ids, unique_venues, side='left')
-            last_sub_u  = np.searchsorted(self._subset_venue_ids, unique_venues, side='right')
+            first_sub_u, last_sub_u = bounds_for_sorted_key(
+                self._subset_venue_ids, unique_venues)
             first_sub   = first_sub_u[venue_inverse]
             has_subset  = first_sub < last_sub_u[venue_inverse]
 
             subset_row = np.where(has_subset, first_sub + subset_pos, -1)
             valid      = subset_row >= 0
-            unique_subset_rows, subset_inverse = np.unique(subset_row[valid], return_inverse=True)
+            unique_subset_rows, subset_inverse = dedup_with_inverse(subset_row[valid])
             subset_name_u = pd.Series(
                 subset_names[unique_subset_rows.tolist()]).str.decode('utf-8').to_numpy()
 
