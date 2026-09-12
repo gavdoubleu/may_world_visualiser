@@ -62,7 +62,7 @@ def test_geography_level_serialises_numpy_typed_values(client_for):
         .build_context()
     )
     unit = ctx.world.geography.get_unit('Norfolk')
-    stats = ctx.world._unit_statistics[unit.id]
+    stats = ctx.world.stats_for_geo_unit(unit.id)
     unit.id = np.int64(unit.id)
     stats.population = np.int64(stats.population)
 

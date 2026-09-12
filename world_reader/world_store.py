@@ -146,6 +146,18 @@ class WorldStore:
             self._slim_statistics_computed = True
         return self._slim_statistics
 
+    def stats_for_geo_unit(self, unit_id):
+        """UnitStats for a GeoUnit's subtree, or None if it has none.
+
+        Args:
+            unit_id: GeoUnit id.
+
+        Returns:
+            UnitStats, or None if the unit has no direct assignment and no
+            descendant with one.
+        """
+        return self._unit_statistics.get(unit_id)
+
     def __str__(self):
         n_units = len(self.geography.units_by_id) if self.geography else 0
         return f"<WorldStore: {n_units} units (lazy people/venues)>"

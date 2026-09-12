@@ -64,8 +64,8 @@ def load_events_with_world(events_path: str, world=None) -> EventAggregator:
     resident WorldStore, read events HDF5, return a ready aggregator.
 
     Coords and population both come from already-resident state — coordinates
-    from the geography tree, population from the subtree-aggregated
-    `_unit_statistics` (the lazy backend never materialises `GeoUnit.people`,
+    from the geography tree, population from `WorldStore.stats_for_geo_unit`
+    (subtree-aggregated; the lazy backend never materialises `GeoUnit.people`,
     so the old `get_people()` count was always empty → rate always 0).
     """
     coords: dict[int, tuple[float, float]] = {}
@@ -73,12 +73,10 @@ def load_events_with_world(events_path: str, world=None) -> EventAggregator:
 
     if world and world.geography:
         coords = world.geography.geo_unit_coords()
-        unit_statistics = getattr(world, '_unit_statistics', None) or {}
-        population = {
-            unit.id: unit_statistics[unit.id].population
-            for unit in world.geography.units_by_id.values()
-            if unit.id in unit_statistics
-        }
+        for unit in world.geography.units_by_id.values():
+            stats = world.stats_for_geo_unit(unit.id)
+            if stats is not None:
+                population[unit.id] = stats.population
 
     aggregator = load_event_aggregator(events_path, coords, population)
     logger.info(f"Set {len(coords)} geo_unit coordinates from world")

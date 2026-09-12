@@ -58,7 +58,7 @@ def get_geography_level(level):
         # Hot loop over every unit in the level (~200k at SGU scale): bind the
         # repeated lookups to locals and skip the numpy coercion — orjson
         # serialises numpy scalars directly.
-        get_stats = world._unit_statistics.get
+        get_stats = world.stats_for_geo_unit
         features = []
         append_feature = features.append
         for unit in units.values():
@@ -106,7 +106,7 @@ def get_unit_details(unit_name):
         if not unit:
             return jsonify({'error': f'Unit {unit_name} not found'}), 404
 
-        stats = world._unit_statistics.get(unit.id)
+        stats = world.stats_for_geo_unit(unit.id)
         if stats is None:
             return jsonify({'error': f'No statistics for unit {unit_name}'}), 404
 
@@ -120,7 +120,7 @@ def get_unit_details(unit_name):
 
         children_info = []
         for child in (unit.children or []):
-            child_stats = world._unit_statistics.get(child.id)
+            child_stats = world.stats_for_geo_unit(child.id)
             children_info.append({
                 'id': child.id,
                 'name': child.name,

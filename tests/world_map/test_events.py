@@ -202,7 +202,7 @@ def test_load_events_with_world_population_from_statistics(tmp_path):
     # — the old unit.people path left this empty in lazy mode.
     assert agg.geo_unit_population
     unit_id = world.geography.get_unit('A').id
-    assert agg.geo_unit_population[0] == world._unit_statistics[unit_id].population == 4
+    assert agg.geo_unit_population[0] == world.stats_for_geo_unit(unit_id).population == 4
     # Coords come straight from the geography tree.
     assert agg.geo_unit_coords[0] == world.geography.units_by_id[0].coordinates
 

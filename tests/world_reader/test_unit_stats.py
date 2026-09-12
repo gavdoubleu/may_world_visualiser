@@ -17,20 +17,20 @@ def test_unit_stats_construction():
 def test_unit_statistics_populated_after_build():
     world = WorldBuilder().add_unit('Norfolk', level='county', population=1).build_world()
     unit_id = world.geography.get_unit('Norfolk').id
-    assert unit_id in world._unit_statistics
-    assert isinstance(world._unit_statistics[unit_id], UnitStats)
+    assert world.stats_for_geo_unit(unit_id) is not None
+    assert isinstance(world.stats_for_geo_unit(unit_id), UnitStats)
 
 
 def test_population_count():
     world = WorldBuilder().add_unit('Norfolk', population=42).build_world()
     unit_id = world.geography.get_unit('Norfolk').id
-    assert world._unit_statistics[unit_id].population == 42
+    assert world.stats_for_geo_unit(unit_id).population == 42
 
 
 def test_age_distribution():
     world = WorldBuilder().add_unit('Norfolk', population=5).build_world()
     unit_id = world.geography.get_unit('Norfolk').id
-    stats = world._unit_statistics[unit_id]
+    stats = world.stats_for_geo_unit(unit_id)
     assert set(stats.age_distribution.keys()) == set(AGE_LABELS)
     assert stats.people_aged('25-34') == 5   # WorldBuilder default age=30
     assert stats.people_aged('0-15') == 0
@@ -44,4 +44,4 @@ def test_parent_aggregates_descendants():
         .build_world()
     )
     england_id = world.geography.get_unit('England').id
-    assert world._unit_statistics[england_id].population == 100
+    assert world.stats_for_geo_unit(england_id).population == 100

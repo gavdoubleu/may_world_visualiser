@@ -74,10 +74,9 @@ def get_tree():
     if not world.geography:
         return jsonify([])
 
-    stats = getattr(world, '_unit_statistics', {}) or {}
     nodes = []
     for uid, unit in world.geography.units_by_id.items():
-        unit_stats = stats.get(unit.id)
+        unit_stats = world.stats_for_geo_unit(unit.id)
         nodes.append({
             'id':           int(uid),
             'name':         unit.name,
@@ -109,7 +108,7 @@ def get_unit_detail(unit_id):
     if not unit:
         return jsonify({'error': f'Unit {unit_id} not found'}), 404
 
-    stats = world._unit_statistics.get(unit_id)
+    stats = world.stats_for_geo_unit(unit_id)
     if stats is None:
         return jsonify({'error': f'No statistics for unit {unit_id}'}), 404
 
@@ -120,7 +119,7 @@ def get_unit_detail(unit_id):
 
     children_info = []
     for child in (unit.children or []):
-        child_stats = world._unit_statistics.get(child.id)
+        child_stats = world.stats_for_geo_unit(child.id)
         children_info.append({
             'id': child.id, 'name': child.name, 'level': child.level,
             'population': child_stats.population if child_stats else 0,
